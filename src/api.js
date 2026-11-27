@@ -65,9 +65,9 @@ export async function api(req, env, url, me, now = Date.now()) {
     }
     stmts.push(env.DB.prepare('INSERT INTO drafts (business_id, data, offline, updated) VALUES (?, ?, ?, ?)').bind(bid, JSON.stringify(d.landing), d.offline ? 1 : 0, now));
     stmts.push(env.DB.prepare('INSERT INTO messages (business_id, role, content, at) VALUES (?, ?, ?, ?)').bind(bid, 'assistant',
-      `I drafted ${name}: a one-liner, a vision, a landing page and ${d.tasks.length} first tasks.${d.offline ? ' No model was connected, so this is a fixed playbook filled from your idea.' : ''} Nothing runs until you approve a task and press Start. Ask me anything about it here.`, now));
+      `Hello! I made a first plan for ${name}: a short description, a simple web page and ${d.tasks.length} first jobs.${d.offline ? ' This is a ready-made starter plan.' : ''} Nothing happens until you say yes to a job and press Start. You can ask me anything here.`, now));
     await env.DB.batch(stmts);
-    await audit(env, bid, me.id, 'created', `From the idea "${idea.slice(0, 120)}". ${d.offline ? 'Offline draft.' : 'Drafted by ' + d.model + '.'} Starts paused.`, now);
+    await audit(env, bid, me.id, 'created', `From "${idea.slice(0, 120)}". Nothing happens until you press Start.`, now);
     return json(201, { id: bid, name, offline: d.offline });
   }
   if (p === '/api/businesses' && m === 'POST') {
@@ -81,7 +81,7 @@ export async function api(req, env, url, me, now = Date.now()) {
       await env.DB.prepare('INSERT INTO businesses (id, user_id, name, one_liner, north_star, status, created) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .bind(bid, me.id, n.name, str(body.one_liner, 160), str(body.north_star, 80), 'paused', now).run();
     } catch { return err(409, 'name_taken'); }
-    await audit(env, bid, me.id, 'created', `Claimed ${n.name}. Starts paused: nothing runs until you press Start.`, now);
+    await audit(env, bid, me.id, 'created', `Made ${n.name}. Nothing happens until you press Start.`, now);
     return json(201, { id: bid, name: n.name });
   }
 

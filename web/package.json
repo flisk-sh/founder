@@ -9,9 +9,6 @@
   "dependencies": {
     "@astryxdesign/core": "0.7.17",
     "@astryxdesign/theme-chocolate": "0.7.17",
-    "@astryxdesign/theme-gothic": "0.7.17",
-    "@astryxdesign/theme-matcha": "0.7.17",
-    "@astryxdesign/theme-neutral": "0.7.17",
     "@heroicons/react": "^2.2.0",
     "@stylexjs/stylex": "^0.19.2",
     "react": "19",

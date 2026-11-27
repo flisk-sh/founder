@@ -28,11 +28,12 @@ function cleanLanding(l, fallbackName) {
   return { headline: s(l?.headline, 90) || fallbackName, sub: s(l?.sub, 200), bullets, cta: s(l?.cta, 30) || 'Join the waitlist' };
 }
 
-const ONBOARD_SYSTEM = `You are the co-founder of a tiny new internet business. From the founder's idea, answer ONLY with JSON:
+const ONBOARD_SYSTEM = `The owner is not technical (think a restaurant, café or shop owner). Write everything in plain everyday words, short sentences, no tech or marketing jargon.
+You help the owner of a small business (new or existing). From what the owner wrote, answer ONLY with JSON:
 {"one_liner": "<=100 chars, what it does for whom", "vision": "3 short sentences: mission, what we build, where we head",
-"north_star": "<=40 chars, ONE number that proves people want it, e.g. Paying customers",
+"north_star": "<=40 chars, ONE number the owner can count each week, e.g. Tables booked each week",
 "landing": {"headline": "<=70 chars", "sub": "<=160 chars", "bullets": ["3 concrete benefits"], "cta": "<=24 chars"},
-"tasks": [5 items {"kind": "engineering|research|growth|ops", "title": "<=90 chars, verb first", "body": "2 lines: what done looks like", "spend_kind": "llm|infra", "cost_usd": 0.1-3}]}
+"tasks": [5 items {"kind": "engineering|research|growth|ops", "title": "<=70 chars, verb first, everyday words", "body": "2 lines: what done looks like", "spend_kind": "llm|infra", "cost_usd": 0.1-3}]}
 Task 1 must be research on who exactly buys. Never propose paid ads, cold email or posting without the founder. Plain words.`;
 
 export async function onboard(env, idea) {
@@ -50,15 +51,15 @@ export async function onboard(env, idea) {
 export function offlineOnboard(idea, name = suggestName(idea)) {
   const what = s(idea, 100);
   return {
-    offline: true, model: null, name, one_liner: what, north_star: 'Paying customers',
-    vision: `We exist to make "${what}" simple and dependable. We start with one narrow group of buyers and learn from every one of them. We grow only on what customers prove they want.`,
-    landing: { headline: what.charAt(0).toUpperCase() + what.slice(1), sub: 'Be first to try it. We are building it in the open and will write when it is ready.', bullets: ['Made for one job, done well', 'Your data stays yours', 'Talk to the people who build it'], cta: 'Join the waitlist' },
+    offline: true, model: null, name, one_liner: what, north_star: 'Customers each week',
+    vision: `${what.charAt(0).toUpperCase() + what.slice(1)}. We start small, with the people closest to us, and listen to every guest. We grow only when people keep coming back.`,
+    landing: { headline: what.charAt(0).toUpperCase() + what.slice(1), sub: 'Opening soon. Leave your email and we will tell you first.', bullets: ['Made with care', 'Fair prices', 'Friendly and local'], cta: 'Tell me when it opens' },
     tasks: [
-      { kind: 'research', title: 'Name the first 50 buyers and where they talk', body: 'One narrow group, its job title, and 5 real places online they discuss this problem.', spend_kind: 'llm', cost_usd: 0.5 },
-      { kind: 'research', title: 'Compare 4 alternatives people use today', body: 'What each costs, what users praise and complain about, and our one clear difference.', spend_kind: 'llm', cost_usd: 0.5 },
-      { kind: 'engineering', title: 'Publish the landing page with a waitlist', body: 'The draft page live on the app address, with a form that stores emails with consent.', spend_kind: 'infra', cost_usd: 1 },
-      { kind: 'growth', title: 'Draft 3 posts for the places buyers talk', body: 'Drafts only. You read and post them yourself.', spend_kind: 'llm', cost_usd: 0.3 },
-      { kind: 'ops', title: 'Set the price to test first', body: 'One price, one plan, and the reason. No payment setup yet.', spend_kind: 'llm', cost_usd: 0.2 },
+      { kind: 'research', title: 'Describe your best customers', body: 'Who they are, when they come, and where they hear about places like yours.', spend_kind: 'llm', cost_usd: 0.5 },
+      { kind: 'research', title: 'Look at 4 places people compare you with', body: 'Their prices, what guests praise and complain about, and what makes you different.', spend_kind: 'llm', cost_usd: 0.5 },
+      { kind: 'engineering', title: 'Put your web page online', body: 'Your page goes online with a form where people can leave their email.', spend_kind: 'infra', cost_usd: 1 },
+      { kind: 'growth', title: 'Write 3 posts for Facebook and Instagram', body: 'Only written for you. You read them and post them yourself.', spend_kind: 'llm', cost_usd: 0.3 },
+      { kind: 'ops', title: 'Choose your first prices', body: 'A simple price list to start with, and why. Nothing is charged.', spend_kind: 'llm', cost_usd: 0.2 },
     ],
   };
 }
@@ -66,7 +67,7 @@ export function offlineOnboard(idea, name = suggestName(idea)) {
 const CHAT_SYSTEM = (b, tasks) => `You are the AI co-founder of "${b.name}": ${b.one_liner}. North star: ${b.north_star || 'not set'}.
 Vision: ${b.vision || '-'}
 Open tasks: ${tasks.map((t) => `[${t.status}] ${t.title}`).join('; ') || 'none'}.
-You cannot spend, send, post or deploy anything: you can only PROPOSE a task, which the founder approves. Be short, concrete and honest; say when you do not know.
+You cannot spend, send, post or deploy anything: you can only PROPOSE a task, which the founder approves. The owner is not technical (think a restaurant or shop owner): use plain everyday words, no tech or marketing jargon, short sentences. Be concrete and honest; say when you do not know.
 Answer ONLY with JSON: {"reply": "your answer, under 120 words", "propose": null or {"kind": "engineering|research|growth|ops", "title": "...", "body": "...", "spend_kind": "llm|infra", "cost_usd": 0.1-3}}`;
 
 export async function chat(env, b, tasks, history, text) {
@@ -76,10 +77,10 @@ export async function chat(env, b, tasks, history, text) {
   if (j?.reply) return { reply: s(j.reply, 1200), propose: j.propose ? cleanTask(j.propose) : null, offline: false };
   if (ans?.text) return { reply: s(ans.text, 1200), propose: null, offline: false };
   // Offline: the one useful thing without a model is turning the request into a proposed task.
-  const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up)\b/i.test(s(text, 200));
+  const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up|plan|check|list|suggest|prepare)\b/i.test(s(text, 200));
   return {
     offline: true,
-    reply: want ? 'No model is connected right now, so I turned your message into a proposed task. Approve it in Tasks when you are ready.' : 'No model is connected right now, so I cannot answer questions yet. Start a message with a verb (add, research, draft…) and I will turn it into a proposed task.',
+    reply: want ? 'I wrote that down as a new job. Say yes to it on the left when you are ready.' : 'I cannot answer questions right now. Tell me a job instead, like “write a summer menu”, and I will add it for you to say yes to.',
     propose: want ? cleanTask({ kind: /research|find|compare/i.test(text) ? 'research' : 'engineering', title: s(text, 90), body: 'From chat.', spend_kind: 'llm', cost_usd: 0.5 }) : null,
   };
 }
@@ -87,15 +88,15 @@ export async function chat(env, b, tasks, history, text) {
 // Doing an approved task. Research and drafts are done by the model now; building and deploying needs fleet (not wired yet),
 // so those come back as a plan plus an honest note of what was not done. `verified` always says what was really checked.
 const RUN_SYSTEM = (b) => `You work for "${b.name}" (${b.one_liner}). Do the task below as well as you can in text: a research memo, a plan, copy or a spec.
-Use short headings and lists. Say clearly what you could not check (you have no web access) instead of making facts up. Under 350 words.`;
+Write for a non-technical owner in plain everyday words. Use short headings and lists. Say clearly what you could not check (you have no web access) instead of making facts up. Under 350 words.`;
 
 export async function runTask(env, b, w) {
   const builds = w.kind === 'engineering';
   const ans = await ask(env, [{ role: 'system', content: RUN_SYSTEM(b) }, { role: 'user', content: `${w.title}\n\n${w.body}` }], { maxTokens: 700 });
-  if (!ans) return { ok: false, result: '', verified: 'Not run: no model is connected. Nothing was spent; the reserved amount is released.' };
+  if (!ans) return { ok: false, result: '', verified: 'Not done: the assistant is not connected right now. Nothing was spent.' };
   const verified = [
-    `Written by ${ans.model}. No web access: names, prices and numbers in it are not checked.`,
-    builds ? 'Not built or deployed: building needs the fleet connection, which is not set up yet. This is the plan for it.' : null,
+    'Written by the assistant. It cannot look things up online, so please check names, prices and numbers yourself.',
+    builds ? 'Not put online yet: this is the plan for it.' : null,
   ].filter(Boolean).join(' ');
   return { ok: true, result: String(ans.text).slice(0, 6000), verified };
 }

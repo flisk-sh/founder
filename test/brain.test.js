@@ -96,7 +96,7 @@ describe('running tasks', () => {
     const d2 = await (await req(e, c, `/api/businesses/${id}`)).json();
     const done = d2.work.find((x) => x.id === w.id);
     expect(done.result).toContain('Buyers');
-    expect(done.verified).toContain('Not built or deployed');
+    expect(done.verified).toContain('Not put online yet');
     expect(d2.spent.infra).toBe(0);
     expect((await (await req(e, c, `/api/work/${w.id}/run`, 'POST', {})).json()).status).toBe('already_running_or_done');
   });
