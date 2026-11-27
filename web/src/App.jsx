@@ -268,12 +268,15 @@ function Settings({d, act, onDeleted}) {
 }
 
 const SUGGEST = [
-  ['Write a summer menu', 'Five dishes with short, tasty descriptions', ClipboardDocumentListIcon],
-  ['Ideas for a lunch deal', 'Three offers that bring people in at noon', BanknotesIcon],
-  ['Answer a bad review politely', 'Paste the review, get a calm reply', ChatBubbleLeftRightIcon],
-  ['Plan a small opening party', 'Who to invite, what to serve, what it costs', SparklesIcon],
-  ['Write a post for this weekend', 'For Facebook or Instagram, ready to copy', ChartBarIcon],
-  ['Check my prices', 'Compare with places nearby', LightBulbIcon],
+  ['Write a summer menu', 'Five dishes with short, tasty descriptions', 'e.g. Grilled peach salad with burrata, basil and honey', ClipboardDocumentListIcon],
+  ['Ideas for a lunch deal', 'Offers that bring people in at noon', 'e.g. Pasta and a drink for $12, Monday to Friday', BanknotesIcon],
+  ['Answer a bad review politely', 'Paste the review, get a calm reply', 'e.g. “Thank you for telling us. We are sorry the wait was long…”', ChatBubbleLeftRightIcon],
+  ['Plan a small opening party', 'Who to invite, what to serve, the cost', 'e.g. 40 guests, prosecco and small bites, about $600', SparklesIcon],
+  ['Write a post for this weekend', 'For Facebook or Instagram, ready to copy', 'e.g. “This Saturday: fresh ravioli, made by hand”', ChartBarIcon],
+  ['Check my prices', 'Compare with places nearby', 'e.g. Your pizza $14, others nearby $12 to $16', LightBulbIcon],
+  ['Write a sign for the door', 'Opening hours and a warm welcome', 'e.g. Open 12 to 22 · Families welcome · Ask about gluten-free', BuildingStorefrontIcon],
+  ['Plan an offer for quiet days', 'Fill the tables on slow evenings', 'e.g. Tuesdays: two mains for the price of one and a half', ClockIcon],
+  ['Make a staff checklist', 'Opening and closing steps', 'e.g. Fridge temperatures, bread order, chairs down, alarm on', CheckCircleIcon],
 ];
 function Chat({d, reload, text, setText, inputRef}) {
   const [busy, setBusy] = useState(false), [pending, setPending] = useState(''), end = useRef(null);
@@ -294,8 +297,8 @@ function Chat({d, reload, text, setText, inputRef}) {
           : <div key={i} className={'msg ' + m.role}>{m.role === 'assistant' ? <Markdown density="compact">{m.content}</Markdown> : m.content}</div>)}
         {pending && <><div className="msg user">{pending}</div><div className="msg assistant"><Text color="secondary">Writing…</Text></div></>}
         {asked < 3 && !pending && <div className="ideas"><small>What I can do for you · click one</small>
-          <div className="ideas-grid">{SUGGEST.map(([t, dsc, I]) => <button key={t} className="idea" disabled={busy} onClick={() => send(null, t)}>
-            <span className="chip-ic"><Icon icon={I} size="sm" /></span><span><b>{t}</b><em>{dsc}</em></span></button>)}</div></div>}
+          <div className="ideas-grid">{SUGGEST.map(([t, dsc, ex, I]) => <button key={t} className="idea" disabled={busy} onClick={() => send(null, t)}>
+            <span className="chip-ic"><Icon icon={I} size="sm" /></span><span><b>{t}</b><em>{dsc}</em><i>{ex}</i></span></button>)}</div></div>}
         <div ref={end} />
       </div>
 
@@ -378,6 +381,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <span><Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} /></span>
         </HoverCard>
         <Text color="secondary" className="one">{b.one_liner || ''}</Text>
+        <span className="next-in"><Icon icon={LightBulbIcon} size="sm" />{next}{busy && <em> · Working…</em>}</span>
         {done > 0 && <Badge label={`${done} done`} variant="success" />}
         {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={`${money(spent)} of ${money(limit)}`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
         <Tooltip content="Search and do anything"><span className="find-btn"><Button label="Search" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} /></span></Tooltip>
@@ -386,7 +390,6 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           : <Button label="Start" size="sm" variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={start} />}
         <DropdownMenu button={{label: 'More', variant: 'ghost', size: 'sm', isIconOnly: true, icon: <Icon icon={EllipsisHorizontalIcon} size="sm" />}} items={menu} alignment="end" />
       </header>
-      <div className="next"><Icon icon={LightBulbIcon} size="sm" /><span>{next}</span>{busy && <span className="busy">Working…</span>}</div>
       <div className="work-grid">
         <aside className="work-left">
           <div className="lp-block"><small>Your goal</small><b className="lp-goal">{b.north_star || 'Not set yet'}</b>
@@ -395,6 +398,10 @@ function Business({id, onChange, onDeleted, businesses, go}) {
             {Object.keys(SPEND_LABEL).map((k) => <div key={k} className="lp-cap"><span>{SPEND_LABEL[k]}</span><em>{d.caps[k] ? money(Math.max(0, d.spent[k])) + ' / ' + money(d.caps[k]) : 'off'}</em>
               <ProgressBar label={SPEND_LABEL[k]} isLabelHidden value={Math.max(0, d.spent[k])} max={d.caps[k] || 1} /></div>)}
             <Text type="supporting" color="secondary">Change a limit: ⋯ → Monthly limits</Text></div>
+          {(b.vision || d.draft) && <div className="lp-block"><small>Your plan</small>
+            {b.vision && <Text type="supporting">{b.vision}</Text>}
+            {d.draft && <><Text type="supporting" color="secondary">Your web page says:</Text><Text type="supporting"><b>{d.draft.headline}</b>. {d.draft.sub}</Text>
+              <ul className="lp-list">{(d.draft.bullets || []).map((x) => <li key={x}>{x}</li>)}</ul></>}</div>}
           <div className="lp-block grow"><small>What happened</small><Activity d={d} /></div>
         </aside>
         <section className="work-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></section>

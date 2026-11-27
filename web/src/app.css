@@ -239,3 +239,32 @@ html,body{color-scheme:light;background:#f6efe7}
   .work-left .acts{gap:8px;font-size:14px}
 }
 @media (max-width:1100px){.work-rail .task-title{display:block;-webkit-line-clamp:unset}}
+/* Fill the screen with content, not padding. */
+.next-in{flex:1 1 auto!important;min-width:0;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--color-accent-muted,#8881);color:var(--color-text-accent,inherit);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next-in em{font-style:normal;opacity:.7}
+.work-head .one{flex:0 1 auto;max-width:420px}
+@media (max-width:1500px){.work-head .one{display:none}}
+.work-chat .chat-log{gap:10px}
+.ideas{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+.ideas-grid{flex:1 1 auto;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(110px,1fr)}
+.idea{align-items:stretch}.idea>span:last-child{display:flex;flex-direction:column;gap:2px}
+.idea i{display:block;font-style:italic;font-size:14px;opacity:.85;margin-top:auto;padding-top:6px;border-top:1px dashed var(--color-border,#8883)}
+.lp-list{margin:0;padding-left:18px;font-size:14px;display:grid;gap:2px}
+@media (max-width:1100px){.ideas-grid{grid-template-columns:1fr}.next-in{white-space:normal;flex-basis:100%!important;order:8}}
+.work-chat .chat-log{padding:16px 20px}
+.work-chat .chat-in{padding-left:20px;padding-right:20px}
+.work-chat .msg{max-width:min(900px,85%)}
+.ideas-grid{grid-auto-rows:auto;flex:none}
+.ideas{flex:none}
+.idea i{margin-top:8px}
+.ideas{flex:1 1 auto}.ideas-grid{flex:1 1 auto;grid-auto-rows:minmax(110px,1fr)}
+.idea i{margin-top:auto}
+/* Big screens: bigger text, so the content fills them instead of blank margins. */
+@media (min-width:1700px){
+  [data-astryx-theme]{--font-size-xs:15px;--font-size-sm:17px;--font-size-base:19px;--font-size-lg:23px}
+  .idea b{font-size:19px}.idea em,.idea i{font-size:16px}
+  .work-rail .task-title{font-size:17px}
+  .work-head h2{font-size:30px}
+  .lp-block{font-size:16px}.work-left .acts{font-size:15px}
+  .work-grid{grid-template-columns:340px minmax(0,1fr) clamp(420px,27vw,540px)}
+}
