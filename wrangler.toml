@@ -20,3 +20,9 @@ binding = "AI"
 [[services]]
 binding = "INFERENCE"
 service = "flisk-inference"
+
+# Owners' public web pages at <name>.app.flisk.si are served by this Worker (src/site.js).
+# To turn them on in production: add a wildcard DNS record *.app.flisk.si (proxied), then uncomment and deploy (the user's call).
+# [[routes]]
+# pattern = "*.app.flisk.si/*"
+# zone_name = "flisk.si"

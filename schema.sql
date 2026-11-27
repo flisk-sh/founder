@@ -21,3 +21,7 @@ CREATE INDEX IF NOT EXISTS audit_business ON audit(business_id, at);
 CREATE TABLE IF NOT EXISTS drafts (business_id TEXT PRIMARY KEY, data TEXT NOT NULL, offline INTEGER NOT NULL DEFAULT 0, updated INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS messages (business_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS messages_business ON messages(business_id, at);
+-- The owner's published web page (a copy of the draft at the moment they put it online), sign-ups and daily page views.
+CREATE TABLE IF NOT EXISTS sites (business_id TEXT PRIMARY KEY, data TEXT NOT NULL, published INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS signups (business_id TEXT NOT NULL, email TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (business_id, email));
+CREATE TABLE IF NOT EXISTS visits (business_id TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (business_id, day));

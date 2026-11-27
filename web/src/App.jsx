@@ -55,7 +55,8 @@ async function call(path, method = 'GET', body) {
 const path = () => location.pathname.replace(/\/+$/, '');
 const STATUS = {active: ['success', 'Working'], paused: ['neutral', 'Not started'], stopped: ['error', 'Stopped']};
 // What each logged action means, in plain words.
-const DID = {created: 'Plan made', approved: 'You said yes', rejected: 'You said no', started: 'Started', stopped: 'Stopped', done: 'Done', failed: 'Did not work', running: 'Working on it', caps: 'Limits changed', settings: 'Details changed', proposed: 'New job suggested', deleted: 'Deleted'};
+const siteUrl = (name) => (/\.flisk\.si$/.test(location.hostname) ? 'https://' + name + '.app.flisk.si' : '/s/' + name);
+const DID = {unpublished: 'Taken offline', signup_removed: 'Email removed', created: 'Plan made', approved: 'You said yes', rejected: 'You said no', started: 'Started', stopped: 'Stopped', done: 'Done', failed: 'Did not work', running: 'Working on it', caps: 'Limits changed', settings: 'Details changed', proposed: 'New job suggested', deleted: 'Deleted'};
 const SPEND_LABEL = {llm: 'Assistant', ads: 'Advertising', infra: 'Web page', mail: 'Emails'};
 const KIND_ICON = {engineering: BoltIcon, research: LightBulbIcon, growth: ChartBarIcon, ops: ClipboardDocumentListIcon};
 
@@ -221,7 +222,7 @@ function Website({d, big}) {
   useEffect(() => { fetch('/app/b/' + b.id + '/preview').then((r) => (r.ok ? r.text() : '')).then(setHtml).catch(() => setHtml('')); }, [b.id, d.draft?.headline]);
   if (!d.draft) return <div className="browser empty"><Text color="secondary">No web page yet.</Text></div>;
   return (
-    <div className={'browser' + (big ? ' big' : '')}><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em><b>Draft · not online yet</b></div>
+    <div className={'browser' + (big ? ' big' : '')}><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em><b>{d.site?.published ? 'Online' : 'Draft · not online yet'}</b></div>
       <iframe title={'Web page draft for ' + b.name} srcDoc={html} sandbox="" referrerPolicy="no-referrer" /></div>
   );
 }
@@ -411,11 +412,11 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <div className="sec-h"><h3>How it is going</h3><span className="sub">checked after each batch of jobs</span></div>
           <div className="verdict"><b>{done === 0 ? 'Too early to tell' : 'Keep going'}</b>
             <Text type="supporting" color="secondary">{done === 0 ? 'After the first jobs, you get one clear answer: keep going, change course, grow, or stop.' : 'No sales yet, so the advice is to keep going. You will see "grow" once customers come.'}</Text></div>
-          <div className="sec-h"><h3>Your addresses</h3><span className="sub">kept for you, not online yet</span></div>
+          <div className="sec-h"><h3>Your addresses</h3><span className="sub">kept for you</span></div>
           <dl className="nums addr">
-            <dt>Web page</dt><dd>{b.name}.app.flisk.si</dd>
-            <dt>Short link</dt><dd>{b.name}.flisk.si</dd>
-            <dt>Email</dt><dd>{b.name}@app.flisk.si</dd>
+            <dt>Web page</dt><dd>{d.site?.published ? <a href={siteUrl(b.name)} target="_blank" rel="noopener">{b.name}.app.flisk.si</a> : b.name + '.app.flisk.si'} <em>{d.site?.published ? 'online' : 'not online yet'}</em></dd>
+            <dt>Short link</dt><dd>{b.name}.flisk.si <em>coming soon</em></dd>
+            <dt>Email</dt><dd>{b.name}@app.flisk.si <em>coming soon</em></dd>
           </dl>
           <div className="sec-h"><h3>Your safety</h3></div>
           <ul className="safe">
@@ -435,11 +436,26 @@ function Business({id, onChange, onDeleted, businesses, go}) {
             {d.work.filter((w) => w.result).map((w) => <li key={w.id}><button onClick={() => setDoc({title: w.title, body: w.result + (w.verified ? '\n\n**Good to know:** ' + w.verified : '')})}><Icon icon={CheckCircleIcon} size="sm" />{w.title}</button><em>{ago(w.finished || w.created)}</em></li>)}
             {!d.work.some((w) => w.result) && <li className="muted">Finished jobs appear here as documents you can read and copy.</li>}
           </ul>
+          <div className="sec-h"><h3>People who want to hear from you</h3><span className="sub">{d.site?.signups.length || 0}</span>
+            {d.site?.signups.length > 0 && <button className="link" onClick={() => { navigator.clipboard?.writeText(d.site.signups.map((x) => x.email).join('\n')); say('Emails copied'); }}>Copy all</button>}</div>
+          {d.site?.signups.length
+            ? <table className="tbl"><tbody>{d.site.signups.slice(0, 6).map((x) => <tr key={x.email}><td>{x.email}</td><td><em>{ago(x.at)}</em></td><td><button className="link" aria-label={'Remove ' + x.email} onClick={() => call('/api/businesses/' + b.id + '/signups', 'DELETE', {email: x.email}).then(load)}>Remove</button></td></tr>)}</tbody></table>
+            : <Text type="supporting" color="secondary">{d.site?.published ? 'When visitors leave their email on your page, it shows here.' : 'Once your page is online, visitors can leave their email and it shows here.'}</Text>}
+          <div className="sec-h"><h3>Connections</h3><span className="sub">free ones work now</span></div>
+          <table className="tbl conn"><tbody>
+            <tr><td>Your web page</td><td>{d.site?.published ? <Badge label="Online" variant="success" /> : <Badge label="Ready" />}</td></tr>
+            <tr><td>Email sign-up list</td><td><Badge label={d.site?.published ? 'On' : 'Ready'} variant={d.site?.published ? 'success' : undefined} /></td></tr>
+            <tr><td>Visitor count</td><td><Badge label={d.site?.published ? 'On' : 'Ready'} variant={d.site?.published ? 'success' : undefined} /></td></tr>
+            {['Taking payments', 'Advertising (Google, Facebook)', 'Posting to Facebook, Instagram, X', 'Sending emails', 'Short link ' + b.name + '.flisk.si'].map((x) => <tr key={x}><td>{x}</td><td><Badge label="Coming soon" /></td></tr>)}
+          </tbody></table>
           <div className="sec-h"><h3>Ideas to ask for</h3><span className="sub">click one, your assistant starts on it</span></div>
           <ul className="docs ideas-list">{SUGGEST.map(([t, , ex, I]) => <li key={t}><button disabled={busy} onClick={() => askNow(t)}><Icon icon={I} size="sm" /><span><b>{t}</b><em>{ex}</em></span></button></li>)}</ul>
         </section>
         <section className="col">
-          <div className="sec-h"><h3>Your web page</h3><button className="link" onClick={() => setDrawer('site')}>Open big</button></div>
+          <div className="sec-h"><h3>Your web page</h3>{d.site?.published
+            ? <><a className="link" href={siteUrl(b.name)} target="_blank" rel="noopener">Visit</a><button className="link" style={{marginLeft: 10}} onClick={() => confirm('Take your web page offline now? Visitors will no longer see it.') && call('/api/businesses/' + b.id + '/unpublish', 'POST', {}).then(load).then(() => say('Your web page is offline'))}>Take offline</button></>
+            : <button className="link" onClick={() => setDrawer('site')}>Open big</button>}</div>
+          {d.site?.published && <Text type="supporting" color="secondary">{d.site.visits_week} visits this week · {d.site.visits_total} in total</Text>}
           <button className="site-thumb" onClick={() => setDrawer('site')} aria-label="Open your web page"><Website d={d} /></button>
           <div className="sec-h"><h3>What happened</h3><button className="link" onClick={() => setDrawer('history')}>All</button></div>
           <Activity d={{...d, audit: d.audit.slice(0, 8)}} />
@@ -447,11 +463,6 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           {(() => { const w = d.work.find((x) => x.kind === 'growth'); return w?.result
             ? <button className="link" onClick={() => setDoc({title: w.title, body: w.result})}>Read the drafts: {w.title}</button>
             : <Text type="supporting" color="secondary">{w ? 'Say yes to “' + w.title + '” and the drafts appear here. You post them yourself.' : 'Ask for posts and the drafts appear here. You post them yourself.'}</Text>; })()}
-          <div className="sec-h"><h3>Email</h3><span className="sub">{b.name}@app.flisk.si</span></div>
-          <table className="tbl"><tbody><tr><td>Sent this month</td><td>0</td></tr><tr><td>Monthly limit</td><td>{d.caps.mail ? money(d.caps.mail) : 'off'}</td></tr></tbody></table>
-          <Text type="supporting" color="secondary">{d.caps.mail ? 'Each email still needs your yes.' : 'Off. Nothing is ever emailed until you set a limit and say yes.'}</Text>
-          <div className="sec-h"><h3>Advertising</h3><span className="sub">spend today $0</span></div>
-          <table className="tbl"><thead><tr><th>Ad</th><th>Spend</th><th>Shown</th><th>Clicks</th></tr></thead><tbody><tr><td colSpan={4} className="muted">No ads. {d.caps.ads ? 'Each ad needs your yes.' : 'Off. To turn on, set an Advertising limit in the More (⋯) menu.'}</td></tr></tbody></table>
         </section>
         <aside className="board-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></aside>
       </div>

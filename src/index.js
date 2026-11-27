@@ -3,6 +3,7 @@ import { authRoute, session } from './auth.js';
 import { api, json } from './api.js';
 import { landingHtml, PREVIEW_HEADERS } from './preview.js';
 import { APP_CSS_PATH, APP_JS_PATH, appAsset } from './app.js';
+import { siteRoute, siteTarget } from './site.js';
 
 const CSP = "default-src 'self'; script-src 'self' https://flisk.si; style-src 'self' 'unsafe-inline' https://flisk.si; font-src 'self'; img-src 'self' data: https://flisk.si; connect-src 'self' https://flisk.si; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
 const SECURE = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'strict-transport-security': 'max-age=31536000; includeSubDomains', 'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()', 'cross-origin-opener-policy': 'same-origin', 'content-security-policy': CSP };
@@ -24,6 +25,7 @@ export default {
 };
 
 async function route(req, env, url, p) {
+  const site = siteTarget(url); if (site) return siteRoute(req, env, url, site);
   const asset = appAsset(p); if (asset) return asset;
   const a = await authRoute(req, env, url); if (a) return a;
   if (p === '/robots.txt') return new Response('User-agent: *\nAllow: /$\nDisallow: /app\nDisallow: /api/\nDisallow: /auth/\n', { headers: { 'content-type': 'text/plain' } });

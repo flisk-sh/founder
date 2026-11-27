@@ -1,5 +1,6 @@
 // The cabinet API. Every query is scoped to the signed-in user; another user's business answers 404, never 403.
 import { chat, onboard, runTask } from './brain.js';
+import { publish, siteStats } from './site.js';
 import { checkName, DEFAULT_CAPS, fitsCap, HOLD_MS, KINDS, monthStart, SPEND, workHash } from './policy.js';
 
 const id = () => crypto.randomUUID();
@@ -94,7 +95,7 @@ export async function api(req, env, url, me, now = Date.now()) {
       const log = (await env.DB.prepare('SELECT action, detail, at FROM audit WHERE business_id = ? ORDER BY at DESC LIMIT 100').bind(b.id).all()).results;
       const draft = await env.DB.prepare('SELECT data, offline FROM drafts WHERE business_id = ?').bind(b.id).first();
       const msgs = (await env.DB.prepare('SELECT role, content, at FROM messages WHERE business_id = ? ORDER BY at DESC LIMIT 60').bind(b.id).all()).results.reverse();
-      return json(200, { business: b, caps: await caps(env, b.id), spent: await spent(env, b.id, now), work, audit: log, revenue: 0, gel: null,
+      return json(200, { business: b, caps: await caps(env, b.id), spent: await spent(env, b.id, now), work, audit: log, revenue: 0, gel: null, site: await siteStats(env, b.id, now),
         draft: draft ? { ...JSON.parse(draft.data), offline: Boolean(draft.offline) } : null, messages: msgs });
     }
     if (sub === '/chat' && m === 'POST') {
@@ -148,15 +149,26 @@ export async function api(req, env, url, me, now = Date.now()) {
       await audit(env, b.id, me.id, 'proposed', `${title} (${kind}, up to $${cost} ${spend})`, now);
       return json(201, w);
     }
+    if (sub === '/unpublish' && m === 'POST') {
+      await env.DB.prepare('DELETE FROM sites WHERE business_id = ?').bind(b.id).run();
+      await audit(env, b.id, me.id, 'unpublished', 'Web page taken offline.', now);
+      return json(200, { ok: true });
+    }
+    if (sub === '/signups' && m === 'DELETE') {
+      await env.DB.prepare('DELETE FROM signups WHERE business_id = ? AND email = ?').bind(b.id, str(body.email, 254).toLowerCase()).run();
+      await audit(env, b.id, me.id, 'signup_removed', 'One email removed from the list.', now);
+      return json(200, { ok: true });
+    }
     if (sub === '/export' && m === 'GET') {
       const all = async (sql) => (await env.DB.prepare(sql).bind(b.id).all()).results;
       const data = { format: 'founder-export.v1', exported: new Date(now).toISOString(), business: b, caps: await all('SELECT kind, monthly_usd FROM caps WHERE business_id = ?'),
-        work: await all('SELECT * FROM work_items WHERE business_id = ?'), meter: await all('SELECT * FROM meter WHERE business_id = ?'), audit: await all('SELECT * FROM audit WHERE business_id = ?') };
+        work: await all('SELECT * FROM work_items WHERE business_id = ?'), meter: await all('SELECT * FROM meter WHERE business_id = ?'), audit: await all('SELECT * FROM audit WHERE business_id = ?'),
+        signups: await all('SELECT email, at FROM signups WHERE business_id = ?'), visits: await all('SELECT day, n FROM visits WHERE business_id = ?') };
       return json(200, data, { 'content-disposition': `attachment; filename="${b.name}-export.json"` });
     }
     if (!sub && m === 'DELETE') {
       if (body.confirm !== b.name) return err(400, 'confirm_name');
-      await env.DB.batch(['work_items', 'meter', 'audit', 'caps'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE business_id = ?`).bind(b.id))
+      await env.DB.batch(['work_items', 'meter', 'audit', 'caps', 'drafts', 'messages', 'sites', 'signups', 'visits'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE business_id = ?`).bind(b.id))
         .concat([env.DB.prepare('DELETE FROM businesses WHERE id = ?').bind(b.id),
           env.DB.prepare('INSERT INTO name_holds (name, until) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET until = excluded.until').bind(b.name, now + HOLD_MS)]));
       return json(200, { deleted: true });
@@ -201,7 +213,8 @@ async function run(env, me, wid, now) {
   if (!(claim.changes ?? claim.meta?.changes)) return { status: 'already_running_or_done' };
   const w = await env.DB.prepare('SELECT * FROM work_items WHERE id = ?').bind(wid).first();
   const b = await env.DB.prepare('SELECT * FROM businesses WHERE id = ?').bind(w.business_id).first();
-  const out = await runTask(env, b, w).catch(() => ({ ok: false, result: '', verified: 'Failed with an error. Nothing was spent.' }));
+  const goesOnline = w.kind === 'engineering' && /web page online|publish/i.test(w.title);
+  const out = await (goesOnline ? publish(env, b, now) : runTask(env, b, w)).catch(() => ({ ok: false, result: '', verified: 'Failed with an error. Nothing was spent.' }));
   const t = Math.max(Date.now(), now + 1);
   // The reservation is released and replaced by what was really spent: the free models cost $0.
   await env.DB.batch([

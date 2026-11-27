@@ -101,3 +101,44 @@ describe('data', () => {
     expect(r.headers.get('x-frame-options')).toBe('DENY');
   });
 });
+
+describe('web page online', () => {
+  const form = (e, path, data, origin = O) => worker.fetch(new Request(O + path, { method: 'POST', redirect: 'manual', headers: { origin, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(data) }), e);
+  async function online() {
+    const e = env(), a = await signIn(e, 'alice');
+    const ob = await (await req(e, a, '/api/onboard', 'POST', { idea: 'A small bakery that delivers bread', name: 'bakery' })).json();
+    const id = ob.id || ob.business?.id;
+    await req(e, a, `/api/businesses/${id}/start`, 'POST', {});
+    const d = await (await req(e, a, `/api/businesses/${id}`)).json();
+    const w = d.work.find((x) => /web page online/i.test(x.title));
+    return { e, a, id, w };
+  }
+  test('nothing is public until the owner approves the job', async () => {
+    const { e, a, w } = await online();
+    expect((await worker.fetch(new Request(`${O}/s/bakery`), e)).status).toBe(404);
+    expect((await (await req(e, a, `/api/work/${w.id}/approve`, 'POST', { hash: w.hash })).json()).status).toBe('done');
+    const r = await worker.fetch(new Request(`${O}/s/bakery`), e);
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain('name="email"');
+  });
+  test('sign-ups are saved once, bots and bad emails are not', async () => {
+    const { e, a, id, w } = await online();
+    await req(e, a, `/api/work/${w.id}/approve`, 'POST', { hash: w.hash });
+    expect((await form(e, '/s/bakery/signup', { email: 'Ann@Example.com' })).status).toBe(303);
+    await form(e, '/s/bakery/signup', { email: 'ann@example.com' });
+    await form(e, '/s/bakery/signup', { email: 'bot@example.com', website: 'x' });
+    expect((await form(e, '/s/bakery/signup', { email: 'nope' })).status).toBe(400);
+    await worker.fetch(new Request(`${O}/s/bakery`), e);
+    const d = await (await req(e, a, `/api/businesses/${id}`)).json();
+    expect(d.site.signups.map((s) => s.email)).toEqual(['ann@example.com']);
+    expect(d.site.visits_week).toBeGreaterThan(0);
+  });
+  test('owner can take it offline, and delete removes everything', async () => {
+    const { e, a, id, w } = await online();
+    await req(e, a, `/api/work/${w.id}/approve`, 'POST', { hash: w.hash });
+    await req(e, a, `/api/businesses/${id}/unpublish`, 'POST', {});
+    expect((await worker.fetch(new Request(`${O}/s/bakery`), e)).status).toBe(404);
+    await req(e, a, `/api/businesses/${id}`, 'DELETE', { confirm: 'bakery' });
+    expect((await req(e, a, `/api/businesses/${id}`)).status).toBe(404);
+  });
+});
