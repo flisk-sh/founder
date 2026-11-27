@@ -1,0 +1,14 @@
+# founder.flisk.si: the private cabinet. Deploy by hand: bunx wrangler@4 deploy (the user's call).
+# Secret: SESSION_SECRET (wrangler secret put SESSION_SECRET). Rotating it signs everyone out, nothing else.
+name = "flisk-founder"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+routes = [{ pattern = "founder.flisk.si", custom_domain = true }]
+
+[vars]
+LOGIN_PUBLIC_KEY = "g_3cGlqaMDf4mM4Bgfv8EO6js7yW_bcSW7cOUpSwLc0"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "founder"
+database_id = "00000000-0000-0000-0000-000000000000"
