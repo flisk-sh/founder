@@ -6,3 +6,4 @@ dist-worker
 .wrangler
 .claude
 .dev.sqlite
+dogfood-output/

@@ -278,7 +278,8 @@ const SUGGEST = [
 function Chat({d, reload, text, setText, inputRef}) {
   const [busy, setBusy] = useState(false), [pending, setPending] = useState(''), end = useRef(null);
   const timeline = [...d.messages.map((m) => ({...m, t: 'm'})), ...d.audit.filter((a) => a.action !== 'created').map((a) => ({...a, t: 'a'}))].sort((x, y) => x.at - y.at);
-  useEffect(() => { end.current?.scrollIntoView({block: 'end'}); }, [timeline.length, pending]);
+  // Scroll only the chat box, never the page (on phones the page would jump past the jobs).
+  useEffect(() => { const log = end.current?.parentElement; if (log) log.scrollTop = log.scrollHeight; }, [timeline.length, pending]);
   const send = async (e, t0) => {
     e?.preventDefault(); const t = (t0 ?? text).trim(); if (!t || busy) return;
     setBusy(true); setPending(t); setText('');
@@ -387,6 +388,15 @@ function Business({id, onChange, onDeleted, businesses, go}) {
       </header>
       <div className="next"><Icon icon={LightBulbIcon} size="sm" /><span>{next}</span>{busy && <span className="busy">Working…</span>}</div>
       <div className="work-grid">
+        <aside className="work-left">
+          <div className="lp-block"><small>Your goal</small><b className="lp-goal">{b.north_star || 'Not set yet'}</b>
+            <Button label="Change" size="sm" variant="ghost" icon={ic(PencilSquareIcon)} onClick={() => setDrawer('details')} /></div>
+          <div className="lp-block"><small>This month · {money(spent)} of {money(limit)}</small>
+            {Object.keys(SPEND_LABEL).map((k) => <div key={k} className="lp-cap"><span>{SPEND_LABEL[k]}</span><em>{d.caps[k] ? money(Math.max(0, d.spent[k])) + ' / ' + money(d.caps[k]) : 'off'}</em>
+              <ProgressBar label={SPEND_LABEL[k]} isLabelHidden value={Math.max(0, d.spent[k])} max={d.caps[k] || 1} /></div>)}
+            <Text type="supporting" color="secondary">Change a limit: ⋯ → Monthly limits</Text></div>
+          <div className="lp-block grow"><small>What happened</small><Activity d={d} /></div>
+        </aside>
         <section className="work-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></section>
         <aside className="work-rail">
           <Queue d={d} act={act} run={run} ask={ask} adding={adding} setAdding={setAdding} />

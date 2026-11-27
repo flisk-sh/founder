@@ -220,3 +220,22 @@ html,body{color-scheme:light;background:#f6efe7}
 .idea b{display:block;font-weight:600}.idea em{display:block;font-style:normal;font-size:14px;opacity:.7;margin-top:2px}
 .idea:hover,.idea:focus-visible{border-color:var(--color-accent,#333);box-shadow:0 2px 8px #0001}
 .idea:disabled{opacity:.5;cursor:default}
+/* Wide screens: left panel with goal, spending and history; chat and preview fill their space. */
+.work-left{display:none}
+.ideas{margin-top:8px}
+.work-chat .chat-log{padding:20px max(20px,calc((100% - 900px)/2))}
+.work-chat .chat-in{padding-left:max(12px,calc((100% - 900px)/2));padding-right:max(12px,calc((100% - 900px)/2))}
+.work-rail .site-thumb{flex:1 1 auto;min-height:240px;display:flex}
+.work-rail .site-thumb .browser{flex:1;display:flex;flex-direction:column}
+.work-rail .site-thumb .browser iframe{flex:1;height:auto;min-height:200px}
+@media (min-width:1500px){
+  .work-grid{grid-template-columns:300px minmax(0,1fr) clamp(400px,28vw,520px)}
+  .work-left{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;padding:12px;border-right:1px solid var(--color-border,#8883);background:var(--color-background-muted,#8881)}
+  .lp-block{display:grid;gap:6px;padding:12px;border:1px solid var(--color-border,#8883);border-radius:12px;background:var(--color-background-card,#fff)}
+  .lp-block>small{font-size:12px;text-transform:uppercase;letter-spacing:.05em;opacity:.6}
+  .lp-block.grow{flex:1 1 auto;min-height:120px;overflow:auto;align-content:start}
+  .lp-goal{font-family:var(--font-family-heading,inherit);font-size:20px}
+  .lp-cap{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:14px}.lp-cap em{font-style:normal;opacity:.7}.lp-cap>:last-child{grid-column:1/-1}
+  .work-left .acts{gap:8px;font-size:14px}
+}
+@media (max-width:1100px){.work-rail .task-title{display:block;-webkit-line-clamp:unset}}
