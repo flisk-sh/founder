@@ -332,10 +332,13 @@ html,body{color-scheme:light;background:#f6efe7}
 .addr dd{font-family:ui-monospace,Menlo,monospace;font-weight:500;font-size:14px}
 .safe{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:14px}
 /* Reviewer fixes: keep the jobs column readable at 1280 */
-@media (max-width:1500px) and (min-width:1101px){.board{grid-template-columns:minmax(0,.9fr) minmax(360px,1.3fr) 320px}.board .col:nth-child(3){display:none}}
+@media (max-width:1279px) and (min-width:1101px){.board{grid-template-columns:minmax(0,.9fr) minmax(360px,1.3fr) 320px}.board .col:nth-child(3){display:none}}
 /* Phone and touch fixes from reviewers */
 @media (pointer:coarse){.find-btn kbd,.find-btn [class*="kbd" i]{display:none}.board .task-act button{min-height:44px}}
 @media (max-width:480px){.board .task-line{grid-template-columns:auto minmax(0,1fr);row-gap:6px}.board .task-line .cost{grid-column:2}.board .task-act{grid-column:1/-1;justify-content:flex-end}.board .task-act button{min-height:44px;min-width:64px}}
 @media (max-width:480px){.board .task-line .cost{text-align:left;justify-self:start}.find-btn kbd,.find-btn [class*="kbd" i]{display:none}}
 .conn td:last-child{text-align:right}.tbl a,.nums a{color:inherit}
 .board-chat .chat,.board-chat .chat-log{min-width:0;overflow-x:hidden}.board-chat .sys{white-space:normal;overflow-wrap:break-word;display:block}.board-chat .sys *{display:inline}
+/* Four columns like Polsia down to 1280: narrower chat, job buttons under the title */
+@media (max-width:1500px) and (min-width:1280px){.board{grid-template-columns:minmax(0,.95fr) minmax(0,1.2fr) minmax(0,.95fr) 300px}
+  .board .task-line{display:flex;flex-wrap:wrap;gap:6px 8px}.board .task-line .task-title{flex:1 1 60%;min-width:0}.board .task-line>:last-child{margin-left:auto}}
