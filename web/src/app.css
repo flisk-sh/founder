@@ -325,3 +325,4 @@ html,body{color-scheme:light;background:#f6efe7}
 @media (max-width:1500px){.board{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr) 340px}.board .col:nth-child(3){display:flex}.board .col{padding:12px 14px}}
 @media (max-width:1279px){.board{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 330px}.board .col:nth-child(3){display:none}}
 .tbl .muted{opacity:.65}
+@media (max-width:1100px){.board .col:nth-child(2){order:-1}}
