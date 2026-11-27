@@ -280,7 +280,7 @@ const SUGGEST = [
 ];
 function Chat({d, reload, text, setText, inputRef}) {
   const [busy, setBusy] = useState(false), [pending, setPending] = useState(''), end = useRef(null);
-  const timeline = [...d.messages.map((m) => ({...m, t: 'm'})), ...d.audit.filter((a) => a.action !== 'created').map((a) => ({...a, t: 'a'}))].sort((x, y) => x.at - y.at);
+  const timeline = [...d.messages.map((m) => ({...m, t: 'm'})), ...d.audit.filter((a) => a.action === 'done' || a.action === 'failed').map((a) => ({...a, t: 'a'}))].sort((x, y) => x.at - y.at);
   // Scroll only the chat box, never the page (on phones the page would jump past the jobs).
   useEffect(() => { const log = end.current?.parentElement; if (log) log.scrollTop = log.scrollHeight; }, [timeline.length, pending]);
   const send = async (e, t0) => {
