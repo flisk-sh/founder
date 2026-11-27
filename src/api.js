@@ -44,6 +44,12 @@ export async function api(req, env, url, me, now = Date.now()) {
     const d = await onboard(env, idea);
     let base = body.name ? checkName(body.name) : checkName(d.name);
     if (base.error && body.name) return err(400, base.error);
+    if (body.name) {
+      const taken = await env.DB.prepare('SELECT 1 FROM businesses WHERE name = ?').bind(base.name).first();
+      const held = await env.DB.prepare('SELECT until FROM name_holds WHERE name = ?').bind(base.name).first();
+      if (taken) return err(409, 'name_taken');
+      if (held && held.until > now) return err(409, 'name_held');
+    }
     if (base.error) base = { name: 'biz-' + crypto.randomUUID().slice(0, 6) };
     const bid = id();
     let name = '';

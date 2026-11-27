@@ -119,3 +119,9 @@ describe('helpers', () => {
     expect(suggestName('!!')).toBe('my-business');
   });
 });
+
+import { splitIdea } from '../src/brain.js';
+test('idea splits into a brand and a short headline', () => {
+  expect(splitIdea("Rosa's taquería & café — tacos al pastor near the market", 'rosas')).toEqual({ brand: "Rosa's taquería & café", headline: 'Tacos al pastor near the market' });
+  expect(splitIdea('A bakery that delivers fresh bread', 'bakery-2').brand).toBe('Bakery');
+});

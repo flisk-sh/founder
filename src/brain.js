@@ -47,13 +47,21 @@ export async function onboard(env, idea) {
   return offlineOnboard(idea, name);
 }
 
+// "Rosa's taquería & café — tacos near the market" -> brand "Rosa's taquería & café", headline "Tacos near the market".
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+export function splitIdea(idea, name) {
+  const parts = String(idea).split(/\s+[—–-]\s+|:\s+/);
+  const humanName = String(name || '').replace(/-\d+$/, '').split('-').map(cap).join(' ');
+  if (parts.length > 1 && parts[0].length <= 40) return { brand: cap(parts[0].trim()), headline: cap(s(parts.slice(1).join(' — '), 70)) };
+  return { brand: humanName, headline: cap(s(idea, 70)) };
+}
 // No model reachable: a fixed playbook filled from the idea. The page says it is an offline draft.
 export function offlineOnboard(idea, name = suggestName(idea)) {
   const what = s(idea, 100);
   return {
     offline: true, model: null, name, one_liner: what, north_star: 'Customers each week',
     vision: `${what.charAt(0).toUpperCase() + what.slice(1)}. We start small, with the people closest to us, and listen to every guest. We grow only when people keep coming back.`,
-    landing: { headline: what.charAt(0).toUpperCase() + what.slice(1), sub: 'Opening soon. Leave your email and we will tell you first.', bullets: ['Made with care', 'Fair prices', 'Friendly and local'], cta: 'Tell me when it opens' },
+    landing: { ...splitIdea(what, name), sub: 'Opening soon. Leave your email and we will tell you first.', bullets: ['Made with care', 'Fair prices', 'Friendly and local'], cta: 'Tell me when it opens' },
     tasks: [
       { kind: 'research', title: 'Describe your best customers', body: 'Who they are, when they come, and where they hear about places like yours.', spend_kind: 'llm', cost_usd: 0.5 },
       { kind: 'research', title: 'Look at 4 places people compare you with', body: 'Their prices, what guests praise and complain about, and what makes you different.', spend_kind: 'llm', cost_usd: 0.5 },
@@ -80,8 +88,8 @@ export async function chat(env, b, tasks, history, text) {
   const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up|plan|check|list|suggest|prepare)\b/i.test(s(text, 200));
   return {
     offline: true,
-    reply: want ? 'I wrote that down as a new job. Say yes to it on the left when you are ready.' : 'I cannot answer questions right now. Tell me a job instead, like “write a summer menu”, and I will add it for you to say yes to.',
-    propose: want ? cleanTask({ kind: /research|find|compare/i.test(text) ? 'research' : 'engineering', title: s(text, 90), body: 'From chat.', spend_kind: 'llm', cost_usd: 0.5 }) : null,
+    reply: want ? 'I wrote that down as a new job. Say yes to it in your job list when you are ready.' : 'I cannot answer questions right now. Tell me a job instead, like “write a summer menu”, and I will add it for you to say yes to.',
+    propose: want ? cleanTask({ kind: /research|find|compare/i.test(text) ? 'research' : 'engineering', title: cap(s(text, 90).replace(/^(please |pls )?(can|could|would) you (please )?/i, '').replace(/[?.!]+$/, '')), body: 'You asked for this in the chat.', spend_kind: 'llm', cost_usd: 0.5 }) : null,
   };
 }
 

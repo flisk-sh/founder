@@ -351,3 +351,7 @@ html,body{color-scheme:light;background:#f6efe7}
 .heat{display:flex;gap:4px}.heat-days,.heat-col{display:grid;grid-template-rows:repeat(7,18px);gap:4px}.heat-days span{font-size:11px;opacity:.6;line-height:18px;padding-right:4px}
 .cell{display:block;width:18px;height:18px;border-radius:4px;background:color-mix(in srgb,var(--color-accent,#b45309) calc((0.12 + var(--v)*0.88)*100%),var(--color-background-muted,#eee));outline:1px solid #0001}
 .cell.future{opacity:.25}
+/* Phone: price next to the title, bigger ⋯ button */
+@media (max-width:480px){.board .task-line{display:flex;flex-wrap:wrap;gap:6px 8px}.board .task-line .task-title{flex:1 1 55%;min-width:0}.board .task-line .cost{white-space:nowrap;align-self:center}.board .task-line>.task-act,.board .task-line>:last-child{flex-basis:100%;display:flex;justify-content:flex-end}
+  .work-head [aria-label="More"],.work-head button[aria-haspopup]{min-width:44px;min-height:44px}}
+@media (max-width:480px){.work-head>:last-child,.work-head>:last-child button{min-width:44px;min-height:44px;opacity:1}}

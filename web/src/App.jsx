@@ -76,6 +76,7 @@ function Landing() {
           <h1>A helper for your business that always asks first</h1>
           <Text color="secondary">For restaurants, cafés, shops and new ideas. It writes a plan, makes a simple web page and does only the jobs you say yes to. You stay in charge of every step and every dollar.</Text>
           <Button label="Sign in to start" variant="primary" size="lg" href="/auth/start" icon={ic(ArrowRightIcon)} />
+          <Text type="supporting" color="secondary">For now you sign in with a free GitHub account. Signing in with your email is coming soon.</Text>
           <HStack gap={2} wrap="wrap" hAlign="center">{trust.map((t) => <Badge key={t} label={t} icon={ic(CheckIcon)} />)}</HStack>
         </VStack>
       </div>

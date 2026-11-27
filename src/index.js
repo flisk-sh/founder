@@ -40,5 +40,7 @@ async function route(req, env, url, p) {
     if (p !== '/' && !me) return new Response(null, { status: 302, headers: { location: '/auth/start' } });
     return html(shell(Boolean(me)));
   }
-  return new Response('Not found', { status: 404 });
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found · Founder</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:18px/1.5 system-ui,sans-serif;background:#f6efe7;color:#4a2c16;text-align:center}a{color:#8a4b1c;font-weight:600}</style></head>
+<body><main><h1 style="font-size:28px">This page does not exist</h1><p>The link may be old or mistyped.</p><p><a href="/">Go to the Founder home page</a></p></main></body></html>`, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } });
 }

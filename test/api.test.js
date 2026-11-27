@@ -143,3 +143,18 @@ describe('web page online', () => {
     expect((await req(e, a, `/api/businesses/${id}`)).status).toBe(404);
   });
 });
+
+describe('chosen names', () => {
+  test('a taken chosen name is refused, not renamed', async () => {
+    const e = env(), a = await signIn(e, 'alice'), b = await signIn(e, 'bob');
+    await req(e, a, '/api/onboard', 'POST', { idea: 'A small bakery that delivers bread', name: 'bakery' });
+    const r = await req(e, b, '/api/onboard', 'POST', { idea: 'Another bakery in town square', name: 'bakery' });
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toBe('name_taken');
+  });
+  test('unknown pages get a friendly page with a way home', async () => {
+    const r = await worker.fetch(new Request(`${O}/nope`), env());
+    expect(r.status).toBe(404);
+    expect(await r.text()).toContain('href="/"');
+  });
+});
