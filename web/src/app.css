@@ -190,3 +190,33 @@ html,body{color-scheme:light;background:#f6efe7}
   .work-rail{overflow:visible}
   .work-head .one{flex-basis:100%;order:9;white-space:normal}
 }
+/* Dense: header on one line, one line per job (full text on hover), no tall empty boxes. */
+.work-head{flex-wrap:nowrap;padding:8px 14px;gap:8px}
+.work-head>*{flex:none}.work-head .one{flex:1 1 auto;min-width:0;max-width:none}
+.work-head h2{white-space:nowrap}
+@media (max-width:1350px){.find-btn button>span:not(:has(svg)):not(:has(kbd)){display:none}}
+.work-grid{grid-template-columns:minmax(0,1fr) clamp(340px,30vw,460px)}
+.work-rail{padding:10px;gap:10px}
+.work-rail .task-line{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:6px 10px;min-height:0}
+.work-rail .task-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;line-height:1.35}
+.work-rail .cost{width:auto;font-size:12px}
+.work-rail .task-act{display:flex;gap:4px;margin:0}
+.work-rail .queue-head{padding:6px 10px;gap:8px;flex-wrap:nowrap}
+.work-rail .queue-head>*{flex:none}
+.work-rail .queue-sub{padding:4px 10px}
+.site-thumb .browser iframe{height:180px}
+.next{padding:5px 14px}
+@media (max-width:1100px){
+  .work-head{flex-wrap:wrap}.work-head .one{flex-basis:100%;white-space:normal}
+  .work-rail .task-title{white-space:normal}
+}
+.work-grid{grid-template-columns:minmax(0,1fr) clamp(400px,36vw,540px)}
+.work-rail .task-title{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.work-rail .queue-head>span[style]{flex:1!important}
+.ideas{display:grid;gap:8px;margin-top:auto;padding-top:12px}
+.ideas small{font-size:12px;text-transform:uppercase;letter-spacing:.05em;opacity:.6}
+.ideas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.idea{all:unset;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--color-border,#8883);border-radius:12px;background:var(--color-background-card,#fff)}
+.idea b{display:block;font-weight:600}.idea em{display:block;font-style:normal;font-size:14px;opacity:.7;margin-top:2px}
+.idea:hover,.idea:focus-visible{border-color:var(--color-accent,#333);box-shadow:0 2px 8px #0001}
+.idea:disabled{opacity:.5;cursor:default}

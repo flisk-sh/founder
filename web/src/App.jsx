@@ -190,7 +190,7 @@ function Queue({d, act, run, ask, adding, setAdding}) {
         <Text type="emphasized">{waiting.length ? `${waiting.length} jobs need your answer` : 'Nothing needs your answer'}</Text>
         {waiting.length > 1 && <Button label="Yes to all" size="sm" variant="primary" icon={ic(CheckIcon)} onClick={approveAll} />}
         <span style={{flex: 1}} />
-        <Button label="Add a job" icon={ic(PlusIcon)} size="sm" variant="ghost" onClick={() => setAdding(!adding)} />
+        <Tooltip content="Add a job"><span><IconButton label="Add a job" icon={<Icon icon={PlusIcon} size="sm" />} size="sm" variant="secondary" onClick={() => setAdding(!adding)} /></span></Tooltip>
       </div>
       {adding && <ProposeForm d={d} act={act} onDone={() => setAdding(false)} />}
       {waiting.map((w) => <TaskRow key={w.id} w={w} act={act} ask={ask} />)}
@@ -267,7 +267,14 @@ function Settings({d, act, onDeleted}) {
   );
 }
 
-const SUGGEST = ['Write a summer menu', 'Ideas for a lunch deal', 'Answer a bad review politely', 'Plan a small opening party'];
+const SUGGEST = [
+  ['Write a summer menu', 'Five dishes with short, tasty descriptions', ClipboardDocumentListIcon],
+  ['Ideas for a lunch deal', 'Three offers that bring people in at noon', BanknotesIcon],
+  ['Answer a bad review politely', 'Paste the review, get a calm reply', ChatBubbleLeftRightIcon],
+  ['Plan a small opening party', 'Who to invite, what to serve, what it costs', SparklesIcon],
+  ['Write a post for this weekend', 'For Facebook or Instagram, ready to copy', ChartBarIcon],
+  ['Check my prices', 'Compare with places nearby', LightBulbIcon],
+];
 function Chat({d, reload, text, setText, inputRef}) {
   const [busy, setBusy] = useState(false), [pending, setPending] = useState(''), end = useRef(null);
   const timeline = [...d.messages.map((m) => ({...m, t: 'm'})), ...d.audit.filter((a) => a.action !== 'created').map((a) => ({...a, t: 'a'}))].sort((x, y) => x.at - y.at);
@@ -285,9 +292,12 @@ function Chat({d, reload, text, setText, inputRef}) {
           ? <div key={i} className="sys"><StatusDot variant={m.action === 'failed' || m.action === 'stopped' ? 'error' : m.action === 'done' || m.action === 'approved' ? 'success' : 'neutral'} label={m.action} /><b>{DID[m.action] || m.action}</b><span>{plain(m.detail)}</span><em>{ago(m.at)}</em></div>
           : <div key={i} className={'msg ' + m.role}>{m.role === 'assistant' ? <Markdown density="compact">{m.content}</Markdown> : m.content}</div>)}
         {pending && <><div className="msg user">{pending}</div><div className="msg assistant"><Text color="secondary">Writing…</Text></div></>}
+        {asked < 3 && !pending && <div className="ideas"><small>What I can do for you · click one</small>
+          <div className="ideas-grid">{SUGGEST.map(([t, dsc, I]) => <button key={t} className="idea" disabled={busy} onClick={() => send(null, t)}>
+            <span className="chip-ic"><Icon icon={I} size="sm" /></span><span><b>{t}</b><em>{dsc}</em></span></button>)}</div></div>}
         <div ref={end} />
       </div>
-      {asked < 3 && <div className="suggest">{SUGGEST.map((x) => <Button key={x} label={x} size="sm" variant="secondary" onClick={() => send(null, x)} isDisabled={busy} />)}</div>}
+
       <form onSubmit={send} className="chat-in">
         <TextArea ref={inputRef} label="Message your assistant" isLabelHidden value={text} onChange={setText} rows={2} placeholder="Ask a question, or say “write a summer menu”" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
         <Button label="Send" variant="primary" type="submit" isDisabled={busy || !text.trim()} icon={ic(ArrowUpIcon)} />
@@ -367,10 +377,9 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <span><Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} /></span>
         </HoverCard>
         <Text color="secondary" className="one">{b.one_liner || ''}</Text>
-        <span style={{flex: 1}} />
         {done > 0 && <Badge label={`${done} done`} variant="success" />}
         {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={`${money(spent)} of ${money(limit)}`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
-        <Button label="Search and do anything" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} />
+        <Tooltip content="Search and do anything"><span className="find-btn"><Button label="Search" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} /></span></Tooltip>
         {b.status === 'active'
           ? <Button label="STOP everything" size="sm" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={stop} />
           : <Button label="Start" size="sm" variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={start} />}
