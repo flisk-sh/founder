@@ -296,14 +296,11 @@ function Chat({d, reload, text, setText, inputRef}) {
           ? <div key={i} className="sys"><StatusDot variant={m.action === 'failed' || m.action === 'stopped' ? 'error' : m.action === 'done' || m.action === 'approved' ? 'success' : 'neutral'} label={m.action} /><b>{DID[m.action] || m.action}</b><span>{plain(m.detail)}</span><em>{ago(m.at)}</em></div>
           : <div key={i} className={'msg ' + m.role}>{m.role === 'assistant' ? <Markdown density="compact">{m.content}</Markdown> : m.content}</div>)}
         {pending && <><div className="msg user">{pending}</div><div className="msg assistant"><Text color="secondary">Writing…</Text></div></>}
-        {asked < 3 && !pending && <div className="ideas"><small>What I can do for you · click one</small>
-          <div className="ideas-grid">{SUGGEST.map(([t, dsc, ex, I]) => <button key={t} className="idea" disabled={busy} onClick={() => send(null, t)}>
-            <span className="chip-ic"><Icon icon={I} size="sm" /></span><span><b>{t}</b><em>{dsc}</em><i>{ex}</i></span></button>)}</div></div>}
         <div ref={end} />
       </div>
 
       <form onSubmit={send} className="chat-in">
-        <TextArea ref={inputRef} label="Message your assistant" isLabelHidden value={text} onChange={setText} rows={2} placeholder="Ask a question, or say “write a summer menu”" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
+        <TextArea ref={inputRef} label="Message your assistant" isLabelHidden value={text} onChange={setText} rows={2} placeholder="Ask your assistant anything…" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
         <Button label="Send" variant="primary" type="submit" isDisabled={busy || !text.trim()} icon={ic(ArrowUpIcon)} />
       </form>
     </div>
@@ -312,7 +309,7 @@ function Chat({d, reload, text, setText, inputRef}) {
 
 function Business({id, onChange, onDeleted, businesses, go}) {
   const [d, setD] = useState(null), [busy, setBusy] = useState(false), [drawer, setDrawer] = useState(''), [palette, setPalette] = useState(false);
-  const [text, setText] = useState(''), [adding, setAdding] = useState(false), inputRef = useRef(null), toast = useToast();
+  const [text, setText] = useState(''), [adding, setAdding] = useState(false), [doc, setDoc] = useState(null), inputRef = useRef(null), toast = useToast();
   const say = (body) => toast({body, autoHideDuration: 4000});
   const load = useCallback(() => call('/api/businesses/' + id).then(setD).catch((x) => say(x.message)), [id]);
   useEffect(() => { setD(null); load(); }, [load]);
@@ -322,6 +319,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
     try { const j = await call(url, method, body); say(j.note ? ok + '. ' + j.note : j.status === 'failed' ? 'It did not work. Open the job to see why.' : ok); await load(); onChange(); return true; }
     catch (x) { say(x.message); return false; } finally { setBusy(false); }
   };
+  const askNow = (t) => run(async () => { await call('/api/businesses/' + b.id + '/chat', 'POST', {text: t}); }, 'Asked: ' + t);
   const ask = (t) => { setText(t); setTimeout(() => inputRef.current?.focus?.(), 50); };
   useHotkeys([
     {keys: 'mod+k', allowInInputs: true, onPress: () => setPalette((x) => !x)},
@@ -390,28 +388,64 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           : <Button label="Start" size="sm" variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={start} />}
         <DropdownMenu button={{label: 'More', variant: 'ghost', size: 'sm', isIconOnly: true, icon: <Icon icon={EllipsisHorizontalIcon} size="sm" />}} items={menu} alignment="end" />
       </header>
-      <div className="work-grid">
-        <aside className="work-left">
-          <div className="lp-block"><small>Your goal</small><b className="lp-goal">{b.north_star || 'Not set yet'}</b>
-            <Button label="Change" size="sm" variant="ghost" icon={ic(PencilSquareIcon)} onClick={() => setDrawer('details')} /></div>
-          <div className="lp-block"><small>This month · {money(spent)} of {money(limit)}</small>
-            {Object.keys(SPEND_LABEL).map((k) => <div key={k} className="lp-cap"><span>{SPEND_LABEL[k]}</span><em>{d.caps[k] ? money(Math.max(0, d.spent[k])) + ' / ' + money(d.caps[k]) : 'off'}</em>
-              <ProgressBar label={SPEND_LABEL[k]} isLabelHidden value={Math.max(0, d.spent[k])} max={d.caps[k] || 1} /></div>)}
-            <Text type="supporting" color="secondary">Change a limit: ⋯ → Monthly limits</Text></div>
-          {(b.vision || d.draft) && <div className="lp-block"><small>Your plan</small>
-            {b.vision && <Text type="supporting">{b.vision}</Text>}
-            {d.draft && <><Text type="supporting" color="secondary">Your web page says:</Text><Text type="supporting"><b>{d.draft.headline}</b>. {d.draft.sub}</Text>
-              <ul className="lp-list">{(d.draft.bullets || []).map((x) => <li key={x}>{x}</li>)}</ul></>}</div>}
-          <div className="lp-block grow"><small>What happened</small><Activity d={d} /></div>
-        </aside>
-        <section className="work-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></section>
-        <aside className="work-rail">
+      {/* Live strip: the last things that happened, like a log. Everything here is real and kept. */}
+      <div className="live-strip">{[...d.audit].slice(0, 4).reverse().map((x, i) => <div key={i}>&gt; {DID[x.action] || x.action}: {plain(x.detail)} <em>{ago(x.at)}</em></div>)}</div>
+      <div className="board">
+        <section className="col">
+          <div className="sec-h"><h3>Your assistant</h3></div>
+          <div className="agent">
+            <pre className="face">{b.status === 'active' ? '( ^ ‿ ^ )' : b.status === 'stopped' ? '( - _ - )' : '( o ‿ o )'}</pre>
+            <div><b>{b.status === 'active' ? 'Working' : b.status === 'stopped' ? 'Stopped' : 'Waiting for you'}</b>
+              <Text type="supporting" color="secondary">{next}</Text></div>
+          </div>
+          <div className="sec-h"><h3>Business</h3><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
+          <dl className="nums">
+            <dt>Your goal</dt><dd>{b.north_star || 'not set'}</dd>
+            <dt>Jobs done</dt><dd>{done} <em>of {d.work.length}</em></dd>
+            <dt>Waiting for you</dt><dd>{waiting.length}</dd>
+            <dt>Spent this month</dt><dd>{money(spent)} <em>of {money(limit)}</em></dd>
+            <dt>Money in</dt><dd>$0 <em>no sales yet</em></dd>
+          </dl>
+          <div className="sec-h"><h3>Monthly limits</h3><span className="sub">it can never spend more</span></div>
+          <table className="tbl"><thead><tr><th>For</th><th>Limit</th><th>Spent</th><th>Left</th></tr></thead>
+            <tbody>{Object.keys(SPEND_LABEL).map((k) => <tr key={k}><td>{SPEND_LABEL[k]}</td><td>{d.caps[k] ? money(d.caps[k]) : 'off'}</td><td>{money(Math.max(0, d.spent[k]))}</td><td>{money(Math.max(0, d.caps[k] - Math.max(0, d.spent[k])))}</td></tr>)}</tbody></table>
+          <div className="sec-h"><h3>Your plan</h3></div>
+          <Text type="supporting">{b.vision || b.one_liner}</Text>
+        </section>
+        <section className="col">
           <Queue d={d} act={act} run={run} ask={ask} adding={adding} setAdding={setAdding} />
-          <button className="site-thumb" onClick={() => setDrawer('site')} aria-label="Open your web page">
-            <Website d={d} /><span className="site-open"><Icon icon={ArrowsPointingOutIcon} size="sm" /> Open your web page</span>
-          </button>
-        </aside>
+          <div className="sec-h"><h3>Documents</h3></div>
+          <ul className="docs">
+            {b.vision && <li><button onClick={() => setDoc({title: 'Your plan', body: b.vision})}><Icon icon={ClipboardDocumentListIcon} size="sm" />Your plan</button><em>{ago(b.created || Date.now())}</em></li>}
+            {d.draft && <li><button onClick={() => setDoc({title: 'Your web page text', body: '## ' + d.draft.headline + '\n\n' + (d.draft.sub || '') + '\n\n' + (d.draft.bullets || []).map((x) => '- ' + x).join('\n')})}><Icon icon={GlobeAltIcon} size="sm" />Your web page text</button><em>draft</em></li>}
+            {d.work.filter((w) => w.result).map((w) => <li key={w.id}><button onClick={() => setDoc({title: w.title, body: w.result + (w.verified ? '\n\n**Good to know:** ' + w.verified : '')})}><Icon icon={CheckCircleIcon} size="sm" />{w.title}</button><em>{ago(w.finished || w.created)}</em></li>)}
+            {!d.work.some((w) => w.result) && <li className="muted">Finished jobs appear here as documents you can read and copy.</li>}
+          </ul>
+          <div className="sec-h"><h3>Ideas to ask for</h3><span className="sub">click one, your assistant starts on it</span></div>
+          <ul className="docs ideas-list">{SUGGEST.map(([t, , ex, I]) => <li key={t}><button disabled={busy} onClick={() => askNow(t)}><Icon icon={I} size="sm" /><span><b>{t}</b><em>{ex}</em></span></button></li>)}</ul>
+        </section>
+        <section className="col">
+          <div className="sec-h"><h3>Your web page</h3><button className="link" onClick={() => setDrawer('site')}>Open big</button></div>
+          <button className="site-thumb" onClick={() => setDrawer('site')} aria-label="Open your web page"><Website d={d} /></button>
+          <div className="sec-h"><h3>What happened</h3><button className="link" onClick={() => setDrawer('history')}>All</button></div>
+          <Activity d={{...d, audit: d.audit.slice(0, 8)}} />
+          <div className="sec-h"><h3>Posts</h3><span className="sub">Facebook and Instagram</span></div>
+          {(() => { const w = d.work.find((x) => x.kind === 'growth'); return w?.result
+            ? <button className="link" onClick={() => setDoc({title: w.title, body: w.result})}>Read the drafts: {w.title}</button>
+            : <Text type="supporting" color="secondary">{w ? 'Say yes to “' + w.title + '” and the drafts appear here. You post them yourself.' : 'Ask for posts and the drafts appear here. You post them yourself.'}</Text>; })()}
+          <div className="sec-h"><h3>Email</h3><span className="sub">{b.name}@app.flisk.si</span></div>
+          <table className="tbl"><tbody><tr><td>Sent this month</td><td>0</td></tr><tr><td>Monthly limit</td><td>{d.caps.mail ? money(d.caps.mail) : 'off'}</td></tr></tbody></table>
+          <Text type="supporting" color="secondary">{d.caps.mail ? 'Each email still needs your yes.' : 'Off. Nothing is ever emailed until you set a limit and say yes.'}</Text>
+          <div className="sec-h"><h3>Advertising</h3><span className="sub">spend today $0</span></div>
+          <table className="tbl"><thead><tr><th>Ad</th><th>Spend</th><th>Shown</th><th>Clicks</th></tr></thead><tbody><tr><td colSpan={4} className="muted">No ads. {d.caps.ads ? 'Each ad needs your yes.' : 'Off until you set a limit (⋯ → Monthly limits).'}</td></tr></tbody></table>
+        </section>
+        <aside className="board-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></aside>
       </div>
+      <Drawer isOpen={!!doc} onOpenChange={(o) => !o && setDoc(null)} label={doc?.title || 'Document'} side="end" width={640}>
+        <DrawerHeader title={doc?.title || ''} onOpenChange={(o) => !o && setDoc(null)} hasDivider
+          endContent={<Button label="Copy" size="sm" variant="ghost" icon={ic(ClipboardIcon)} onClick={() => { navigator.clipboard?.writeText(doc?.body || ''); say('Copied'); }} />} />
+        <div style={{padding: 20}}><Markdown>{doc?.body || ''}</Markdown></div>
+      </Drawer>
       <CommandPalette isOpen={palette} onOpenChange={setPalette} label="Search and do anything" searchSource={source} value="" emptySearchText="Nothing found. Try “yes”, “limit” or “page”."
         onValueChange={(v) => { const c = cmds.find((x) => x.id === v); setPalette(false); c && c.run(); }} />
       <Drawer isOpen={drawer === 'details'} onOpenChange={(o) => !o && setDrawer('')} label="Details and limits" side="end" width={520}>
