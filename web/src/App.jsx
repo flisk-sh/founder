@@ -148,7 +148,7 @@ function TaskRow({w, act, ask}) {
           <HoverCard content={card} placement="left" delay={350}>
             <button className="task-title" onClick={() => setOpen(!open)}>{w.title}</button>
           </HoverCard>
-          <span className="cost">{money(w.cost_usd)}</span>
+          <span className="cost">up to {money(w.cost_usd)}</span>
           {w.status === 'proposed' && <span className="task-act">
             <Button label="Yes" icon={ic(CheckIcon)} size="sm" variant="primary" onClick={yes} />
             <Button label="No" size="sm" variant="secondary" onClick={no} /></span>}
@@ -188,7 +188,7 @@ function Queue({d, act, run, ask, adding, setAdding}) {
     <div className="queue">
       <div className="queue-head">
         <Text type="emphasized">{waiting.length ? `${waiting.length} jobs need your answer` : 'Nothing needs your answer'}</Text>
-        {waiting.length > 1 && <Button label="Yes to all" size="sm" variant="primary" icon={ic(CheckIcon)} onClick={approveAll} />}
+        {waiting.length > 1 && <Button label={`Yes to all (${money(sum)} max)`} size="sm" variant="ghost" icon={ic(CheckIcon)} onClick={approveAll} />}
         <span style={{flex: 1}} />
         <Tooltip content="Add a job"><span><IconButton label="Add a job" icon={<Icon icon={PlusIcon} size="sm" />} size="sm" variant="secondary" onClick={() => setAdding(!adding)} /></span></Tooltip>
       </div>
@@ -353,6 +353,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
     {label: 'What happened', icon: ClockIcon, onClick: () => setDrawer('history')},
     {type: 'divider'},
     {label: 'Download my data', icon: ArrowDownTrayIcon, onClick: download},
+    {type: 'divider'},
     {label: 'Delete this business…', icon: TrashIcon, variant: 'destructive', onClick: () => setDrawer('details')},
   ];
   const cmds = [
@@ -381,7 +382,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
         <Text color="secondary" className="one">{b.one_liner || ''}</Text>
         <span className="next-in"><Icon icon={LightBulbIcon} size="sm" />{next}{busy && <em> · Working…</em>}</span>
         {done > 0 && <Badge label={`${done} done`} variant="success" />}
-        {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={`${money(spent)} of ${money(limit)}`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
+        {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={`Spent ${money(spent)} of ${money(limit)} this month`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
         <Tooltip content="Search and do anything"><span className="find-btn"><Button label="Search" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} /></span></Tooltip>
         {b.status === 'active'
           ? <Button label="STOP everything" size="sm" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={stop} />
@@ -396,24 +397,23 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <div className="agent">
             <pre className="face">{b.status === 'active' ? '( ^ ‿ ^ )' : b.status === 'stopped' ? '( - _ - )' : '( o ‿ o )'}</pre>
             <div><b>{b.status === 'active' ? 'Working' : b.status === 'stopped' ? 'Stopped' : 'Waiting for you'}</b>
-              <Text type="supporting" color="secondary">{next}</Text></div>
+              <Text type="supporting" color="secondary">{b.status === 'active' ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : 'Nothing runs until you press Start at the top.'}</Text></div>
           </div>
           <div className="sec-h"><h3>Business</h3><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
           <dl className="nums">
             <dt>Your goal</dt><dd>{b.north_star || 'not set'}</dd>
             <dt>Jobs done</dt><dd>{done} <em>of {d.work.length}</em></dd>
-            <dt>Waiting for you</dt><dd>{waiting.length}</dd>
-            <dt>Spent this month</dt><dd>{money(spent)} <em>of {money(limit)}</em></dd>
+            <dt>Jobs waiting for your yes</dt><dd>{waiting.length}</dd>
             <dt>Money in</dt><dd>$0 <em>no sales yet</em></dd>
           </dl>
-          <div className="sec-h"><h3>Monthly limits</h3><span className="sub">it can never spend more</span></div>
+          <div className="sec-h"><h3>Monthly limits</h3><span className="sub">it can never spend more</span><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
           <table className="tbl"><thead><tr><th>For</th><th>Limit</th><th>Spent</th><th>Left</th></tr></thead>
             <tbody>{Object.keys(SPEND_LABEL).map((k) => <tr key={k}><td>{SPEND_LABEL[k]}</td><td>{d.caps[k] ? money(d.caps[k]) : 'off'}</td><td>{money(Math.max(0, d.spent[k]))}</td><td>{money(Math.max(0, d.caps[k] - Math.max(0, d.spent[k])))}</td></tr>)}</tbody></table>
           {/* From the businesses diagrams: scorecard verdict (keep / change / stop / grow), given addresses, guardrails. */}
-          <div className="sec-h"><h3>How it is going</h3><span className="sub">checked after each round of work</span></div>
+          <div className="sec-h"><h3>How it is going</h3><span className="sub">checked after each batch of jobs</span></div>
           <div className="verdict"><b>{done === 0 ? 'Too early to tell' : 'Keep going'}</b>
             <Text type="supporting" color="secondary">{done === 0 ? 'After the first jobs, you get one clear answer: keep going, change course, grow, or stop.' : 'No sales yet, so the advice is to keep going. You will see "grow" once customers come.'}</Text></div>
-          <div className="sec-h"><h3>Your addresses</h3><span className="sub">included, ready when you go online</span></div>
+          <div className="sec-h"><h3>Your addresses</h3><span className="sub">kept for you, not online yet</span></div>
           <dl className="nums addr">
             <dt>Web page</dt><dd>{b.name}.app.flisk.si</dd>
             <dt>Short link</dt><dd>{b.name}.flisk.si</dd>
@@ -422,8 +422,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <div className="sec-h"><h3>Your safety</h3></div>
           <ul className="safe">
             <li>✓ Nothing is posted, sent or paid without your yes</li>
-            <li>✓ Spending stops at your monthly limits</li>
-            <li>✓ The STOP button halts everything at once</li>
+            <li>✓ While it works, Start becomes a red STOP button that halts everything</li>
             <li>✓ You can download or delete all your data</li>
           </ul>
           <div className="sec-h"><h3>Your plan</h3></div>
@@ -454,7 +453,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <table className="tbl"><tbody><tr><td>Sent this month</td><td>0</td></tr><tr><td>Monthly limit</td><td>{d.caps.mail ? money(d.caps.mail) : 'off'}</td></tr></tbody></table>
           <Text type="supporting" color="secondary">{d.caps.mail ? 'Each email still needs your yes.' : 'Off. Nothing is ever emailed until you set a limit and say yes.'}</Text>
           <div className="sec-h"><h3>Advertising</h3><span className="sub">spend today $0</span></div>
-          <table className="tbl"><thead><tr><th>Ad</th><th>Spend</th><th>Shown</th><th>Clicks</th></tr></thead><tbody><tr><td colSpan={4} className="muted">No ads. {d.caps.ads ? 'Each ad needs your yes.' : 'Off until you set a limit (⋯ → Monthly limits).'}</td></tr></tbody></table>
+          <table className="tbl"><thead><tr><th>Ad</th><th>Spend</th><th>Shown</th><th>Clicks</th></tr></thead><tbody><tr><td colSpan={4} className="muted">No ads. {d.caps.ads ? 'Each ad needs your yes.' : 'Off. To turn on, set an Advertising limit in the More (⋯) menu.'}</td></tr></tbody></table>
         </section>
         <aside className="board-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></aside>
       </div>

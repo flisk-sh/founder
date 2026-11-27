@@ -331,3 +331,5 @@ html,body{color-scheme:light;background:#f6efe7}
 .verdict b{display:block;font-size:17px;color:var(--color-text-accent,inherit)}
 .addr dd{font-family:ui-monospace,Menlo,monospace;font-weight:500;font-size:14px}
 .safe{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:14px}
+/* Reviewer fixes: keep the jobs column readable at 1280 */
+@media (max-width:1500px) and (min-width:1101px){.board{grid-template-columns:minmax(0,.9fr) minmax(360px,1.3fr) 320px}.board .col:nth-child(3){display:none}}
