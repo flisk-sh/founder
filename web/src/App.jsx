@@ -409,6 +409,23 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <div className="sec-h"><h3>Monthly limits</h3><span className="sub">it can never spend more</span></div>
           <table className="tbl"><thead><tr><th>For</th><th>Limit</th><th>Spent</th><th>Left</th></tr></thead>
             <tbody>{Object.keys(SPEND_LABEL).map((k) => <tr key={k}><td>{SPEND_LABEL[k]}</td><td>{d.caps[k] ? money(d.caps[k]) : 'off'}</td><td>{money(Math.max(0, d.spent[k]))}</td><td>{money(Math.max(0, d.caps[k] - Math.max(0, d.spent[k])))}</td></tr>)}</tbody></table>
+          {/* From the businesses diagrams: scorecard verdict (keep / change / stop / grow), given addresses, guardrails. */}
+          <div className="sec-h"><h3>How it is going</h3><span className="sub">checked after each round of work</span></div>
+          <div className="verdict"><b>{done === 0 ? 'Too early to tell' : 'Keep going'}</b>
+            <Text type="supporting" color="secondary">{done === 0 ? 'After the first jobs, you get one clear answer: keep going, change course, grow, or stop.' : 'No sales yet, so the advice is to keep going. You will see "grow" once customers come.'}</Text></div>
+          <div className="sec-h"><h3>Your addresses</h3><span className="sub">included, ready when you go online</span></div>
+          <dl className="nums addr">
+            <dt>Web page</dt><dd>{b.name}.app.flisk.si</dd>
+            <dt>Short link</dt><dd>{b.name}.flisk.si</dd>
+            <dt>Email</dt><dd>{b.name}@app.flisk.si</dd>
+          </dl>
+          <div className="sec-h"><h3>Your safety</h3></div>
+          <ul className="safe">
+            <li>✓ Nothing is posted, sent or paid without your yes</li>
+            <li>✓ Spending stops at your monthly limits</li>
+            <li>✓ The STOP button halts everything at once</li>
+            <li>✓ You can download or delete all your data</li>
+          </ul>
           <div className="sec-h"><h3>Your plan</h3></div>
           <Text type="supporting">{b.vision || b.one_liner}</Text>
         </section>
