@@ -188,7 +188,7 @@ function Queue({d, act, run, ask, adding, setAdding}) {
     <div className="queue">
       <div className="queue-head">
         <Text type="emphasized">{waiting.length ? `${waiting.length} jobs need your answer` : 'Nothing needs your answer'}</Text>
-        {waiting.length > 1 && <Button label={`Yes to all (${money(sum)} max)`} size="sm" variant="ghost" icon={ic(CheckIcon)} onClick={approveAll} />}
+        {waiting.length > 1 && <Button label={`Yes to all (spend up to ${money(sum)})`} size="sm" variant="ghost" icon={ic(CheckIcon)} onClick={approveAll} />}
         <span style={{flex: 1}} />
         <Tooltip content="Add a job"><span><IconButton label="Add a job" icon={<Icon icon={PlusIcon} size="sm" />} size="sm" variant="secondary" onClick={() => setAdding(!adding)} /></span></Tooltip>
       </div>
@@ -382,7 +382,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
         <Text color="secondary" className="one">{b.one_liner || ''}</Text>
         <span className="next-in"><Icon icon={LightBulbIcon} size="sm" />{next}{busy && <em> · Working…</em>}</span>
         {done > 0 && <Badge label={`${done} done`} variant="success" />}
-        {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={`Spent ${money(spent)} of ${money(limit)} this month`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
+        {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={done === 0 ? `Plan cost ${money(spent)} · limit ${money(limit)} a month` : `Spent ${money(spent)} of ${money(limit)} this month`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
         <Tooltip content="Search and do anything"><span className="find-btn"><Button label="Search" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} /></span></Tooltip>
         {b.status === 'active'
           ? <Button label="STOP everything" size="sm" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={stop} />
@@ -390,20 +390,18 @@ function Business({id, onChange, onDeleted, businesses, go}) {
         <DropdownMenu button={{label: 'More', variant: 'ghost', size: 'sm', isIconOnly: true, icon: <Icon icon={EllipsisHorizontalIcon} size="sm" />}} items={menu} alignment="end" />
       </header>
       {/* Live strip: the last things that happened, like a log. Everything here is real and kept. */}
-      <div className="live-strip">{[...d.audit].slice(0, 4).reverse().map((x, i) => <div key={i}>&gt; {DID[x.action] || x.action}: {plain(x.detail)} <em>{ago(x.at)}</em></div>)}</div>
       <div className="board">
         <section className="col">
           <div className="sec-h"><h3>Your assistant</h3></div>
           <div className="agent">
             <pre className="face">{b.status === 'active' ? '( ^ ‿ ^ )' : b.status === 'stopped' ? '( - _ - )' : '( o ‿ o )'}</pre>
             <div><b>{b.status === 'active' ? 'Working' : b.status === 'stopped' ? 'Stopped' : 'Waiting for you'}</b>
-              <Text type="supporting" color="secondary">{b.status === 'active' ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : 'Nothing runs until you press Start at the top.'}</Text></div>
+              <Text type="supporting" color="secondary">{b.status === 'active' ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : `${done} of ${d.work.length} jobs done so far.`}</Text></div>
           </div>
           <div className="sec-h"><h3>Business</h3><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
           <dl className="nums">
             <dt>Your goal</dt><dd>{b.north_star || 'not set'}</dd>
             <dt>Jobs done</dt><dd>{done} <em>of {d.work.length}</em></dd>
-            <dt>Jobs waiting for your yes</dt><dd>{waiting.length}</dd>
             <dt>Money in</dt><dd>$0 <em>no sales yet</em></dd>
           </dl>
           <div className="sec-h"><h3>Monthly limits</h3><span className="sub">it can never spend more</span><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
