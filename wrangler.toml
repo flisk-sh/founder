@@ -1,4 +1,5 @@
 # founder.flisk.si: the private cabinet. Deploy by hand: bunx wrangler@4 deploy (the user's call).
+# Secrets: SESSION_SECRET, INFERENCE_KEY (inference.flisk.si fallback). Model: Workers AI first.
 # Secret: SESSION_SECRET (wrangler secret put SESSION_SECRET). Rotating it signs everyone out, nothing else.
 name = "flisk-founder"
 main = "src/index.js"
@@ -12,3 +13,10 @@ LOGIN_PUBLIC_KEY = "g_3cGlqaMDf4mM4Bgfv8EO6js7yW_bcSW7cOUpSwLc0"
 binding = "DB"
 database_name = "founder"
 database_id = "00000000-0000-0000-0000-000000000000"
+
+[ai]
+binding = "AI"
+
+[[services]]
+binding = "INFERENCE"
+service = "flisk-inference"

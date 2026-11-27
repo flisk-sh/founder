@@ -1,4 +1,5 @@
 // The cabinet API. Every query is scoped to the signed-in user; another user's business answers 404, never 403.
+import { chat, onboard, runTask } from './brain.js';
 import { checkName, DEFAULT_CAPS, fitsCap, HOLD_MS, KINDS, monthStart, SPEND, workHash } from './policy.js';
 
 const id = () => crypto.randomUUID();
@@ -34,6 +35,41 @@ export async function api(req, env, url, me, now = Date.now()) {
     const list = (await env.DB.prepare('SELECT id, name, one_liner, status FROM businesses WHERE user_id = ? ORDER BY created').bind(me.id).all()).results;
     return json(200, { user: me, businesses: list });
   }
+  if (p === '/api/onboard' && m === 'POST') {
+    const idea = str(body.idea, 500);
+    if (idea.length < 8) return err(400, 'idea_short');
+    const count = await env.DB.prepare('SELECT COUNT(*) AS c FROM businesses WHERE user_id = ?').bind(me.id).first();
+    if (count.c >= 3) return err(400, 'limit_reached');
+    const d = await onboard(env, idea);
+    let base = body.name ? checkName(body.name) : checkName(d.name);
+    if (base.error && body.name) return err(400, base.error);
+    if (base.error) base = { name: 'biz-' + crypto.randomUUID().slice(0, 6) };
+    const bid = id();
+    let name = '';
+    for (const n of [base.name, ...[2, 3, 4, 5, 6, 7, 8, 9].map((i) => `${base.name.slice(0, 28)}-${i}`)]) {
+      const hold = await env.DB.prepare('SELECT until FROM name_holds WHERE name = ?').bind(n).first();
+      if (hold && hold.until > now) continue;
+      try {
+        await env.DB.prepare('INSERT INTO businesses (id, user_id, name, one_liner, north_star, vision, idea, status, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(bid, me.id, n, d.one_liner, d.north_star, d.vision, idea, 'paused', now).run();
+        name = n; break;
+      } catch { /* taken: try the next */ }
+    }
+    if (!name) return err(409, 'name_taken');
+    const stmts = [];
+    for (const [i, t] of d.tasks.entries()) {
+      const w = { id: id(), business_id: bid, ...t };
+      w.hash = await workHash(w);
+      stmts.push(env.DB.prepare('INSERT INTO work_items (id, business_id, kind, title, body, spend_kind, cost_usd, status, hash, created, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(w.id, bid, w.kind, w.title, w.body, w.spend_kind, w.cost_usd, 'proposed', w.hash, now + i, 'founder'));
+    }
+    stmts.push(env.DB.prepare('INSERT INTO drafts (business_id, data, offline, updated) VALUES (?, ?, ?, ?)').bind(bid, JSON.stringify(d.landing), d.offline ? 1 : 0, now));
+    stmts.push(env.DB.prepare('INSERT INTO messages (business_id, role, content, at) VALUES (?, ?, ?, ?)').bind(bid, 'assistant',
+      `I drafted ${name}: a one-liner, a vision, a landing page and ${d.tasks.length} first tasks.${d.offline ? ' No model was connected, so this is a fixed playbook filled from your idea.' : ''} Nothing runs until you approve a task and press Start. Ask me anything about it here.`, now));
+    await env.DB.batch(stmts);
+    await audit(env, bid, me.id, 'created', `From the idea "${idea.slice(0, 120)}". ${d.offline ? 'Offline draft.' : 'Drafted by ' + d.model + '.'} Starts paused.`, now);
+    return json(201, { id: bid, name, offline: d.offline });
+  }
   if (p === '/api/businesses' && m === 'POST') {
     const n = checkName(body.name); if (n.error) return err(400, n.error);
     const count = await env.DB.prepare('SELECT COUNT(*) AS c FROM businesses WHERE user_id = ?').bind(me.id).first();
@@ -56,7 +92,27 @@ export async function api(req, env, url, me, now = Date.now()) {
     if (!sub && m === 'GET') {
       const work = (await env.DB.prepare('SELECT * FROM work_items WHERE business_id = ? ORDER BY created DESC LIMIT 100').bind(b.id).all()).results;
       const log = (await env.DB.prepare('SELECT action, detail, at FROM audit WHERE business_id = ? ORDER BY at DESC LIMIT 100').bind(b.id).all()).results;
-      return json(200, { business: b, caps: await caps(env, b.id), spent: await spent(env, b.id, now), work, audit: log, revenue: 0, gel: null });
+      const draft = await env.DB.prepare('SELECT data, offline FROM drafts WHERE business_id = ?').bind(b.id).first();
+      const msgs = (await env.DB.prepare('SELECT role, content, at FROM messages WHERE business_id = ? ORDER BY at DESC LIMIT 60').bind(b.id).all()).results.reverse();
+      return json(200, { business: b, caps: await caps(env, b.id), spent: await spent(env, b.id, now), work, audit: log, revenue: 0, gel: null,
+        draft: draft ? { ...JSON.parse(draft.data), offline: Boolean(draft.offline) } : null, messages: msgs });
+    }
+    if (sub === '/chat' && m === 'POST') {
+      const text = str(body.text, 1000); if (!text) return err(400, 'empty');
+      const tasks = (await env.DB.prepare('SELECT title, status FROM work_items WHERE business_id = ? ORDER BY created DESC LIMIT 15').bind(b.id).all()).results;
+      const hist = (await env.DB.prepare('SELECT role, content FROM messages WHERE business_id = ? ORDER BY at DESC LIMIT 10').bind(b.id).all()).results.reverse();
+      const out = await chat(env, b, tasks, hist, text);
+      const stmts = [env.DB.prepare('INSERT INTO messages (business_id, role, content, at) VALUES (?, ?, ?, ?)').bind(b.id, 'user', text, now),
+        env.DB.prepare('INSERT INTO messages (business_id, role, content, at) VALUES (?, ?, ?, ?)').bind(b.id, 'assistant', out.reply, now + 1)];
+      let proposed = null;
+      if (out.propose) {
+        proposed = { id: id(), business_id: b.id, ...out.propose }; proposed.hash = await workHash(proposed);
+        stmts.push(env.DB.prepare('INSERT INTO work_items (id, business_id, kind, title, body, spend_kind, cost_usd, status, hash, created, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(proposed.id, b.id, proposed.kind, proposed.title, proposed.body, proposed.spend_kind, proposed.cost_usd, 'proposed', proposed.hash, now + 2, 'chat'));
+      }
+      await env.DB.batch(stmts);
+      if (proposed) await audit(env, b.id, me.id, 'proposed', `${proposed.title} (from chat, up to $${proposed.cost_usd})`, now);
+      return json(200, { reply: out.reply, proposed, offline: out.offline });
     }
     if ((sub === '/stop' || sub === '/start') && m === 'POST') {
       const status = sub === '/stop' ? 'stopped' : 'active';
@@ -126,7 +182,32 @@ export async function api(req, env, url, me, now = Date.now()) {
     await env.DB.batch([env.DB.prepare("UPDATE work_items SET status = 'approved', decided = ? WHERE id = ? AND status = 'proposed'").bind(now, w.id),
       env.DB.prepare('INSERT INTO meter (business_id, kind, cost_usd, note, at) VALUES (?, ?, ?, ?, ?)').bind(w.business_id, w.spend_kind, w.cost_usd, `reserved: ${w.title}`, now)]);
     await audit(env, w.business_id, me.id, 'approved', `${w.title} (up to $${w.cost_usd} ${w.spend_kind}, hash ${w.hash.slice(0, 12)})`, now);
-    return json(200, { status: 'approved' });
+    if (w.b_status !== 'active') return json(200, { status: 'approved', note: 'Runs when you press Start.' });
+    return json(200, await run(env, me, w.id, now));
+  }
+  r = p.match(/^\/api\/work\/([\w-]+)\/run$/);
+  if (r && m === 'POST') {
+    const w = await env.DB.prepare('SELECT w.id, b.status AS b_status FROM work_items w JOIN businesses b ON b.id = w.business_id WHERE w.id = ? AND b.user_id = ?').bind(r[1], me.id).first();
+    if (!w) return err(404, 'not_found');
+    if (w.b_status !== 'active') return err(409, 'not_started');
+    return json(200, await run(env, me, w.id, now));
   }
   return err(404, 'not_found');
+}
+
+// Does one approved task. Claims it first (approved -> running) so two clicks never run it twice.
+async function run(env, me, wid, now) {
+  const claim = await env.DB.prepare("UPDATE work_items SET status = 'running' WHERE id = ? AND status = 'approved'").bind(wid).run();
+  if (!(claim.changes ?? claim.meta?.changes)) return { status: 'already_running_or_done' };
+  const w = await env.DB.prepare('SELECT * FROM work_items WHERE id = ?').bind(wid).first();
+  const b = await env.DB.prepare('SELECT * FROM businesses WHERE id = ?').bind(w.business_id).first();
+  const out = await runTask(env, b, w).catch(() => ({ ok: false, result: '', verified: 'Failed with an error. Nothing was spent.' }));
+  const t = Math.max(Date.now(), now + 1);
+  // The reservation is released and replaced by what was really spent: the free models cost $0.
+  await env.DB.batch([
+    env.DB.prepare('UPDATE work_items SET status = ?, result = ?, verified = ?, finished = ? WHERE id = ?').bind(out.ok ? 'done' : 'failed', out.result, out.verified, t, wid),
+    env.DB.prepare('INSERT INTO meter (business_id, kind, cost_usd, note, at) VALUES (?, ?, ?, ?, ?)').bind(w.business_id, w.spend_kind, -w.cost_usd, `released: ${w.title}`, t),
+  ]);
+  await audit(env, w.business_id, me.id, out.ok ? 'done' : 'failed', `${w.title}. ${out.verified}`, t);
+  return { status: out.ok ? 'done' : 'failed' };
 }

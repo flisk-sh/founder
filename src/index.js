@@ -1,6 +1,7 @@
 // founder.flisk.si: the private cabinet. Sign-in through login.flisk.si, data in D1, the page built from web/ with Astryx.
 import { authRoute, session } from './auth.js';
 import { api, json } from './api.js';
+import { landingHtml, PREVIEW_HEADERS } from './preview.js';
 import { APP_CSS_PATH, APP_JS_PATH, appAsset } from './app.js';
 
 const CSP = "default-src 'self'; script-src 'self' https://flisk.si; style-src 'self' 'unsafe-inline' https://flisk.si; font-src 'self'; img-src 'self' data: https://flisk.si; connect-src 'self' https://flisk.si; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
@@ -28,6 +29,11 @@ async function route(req, env, url, p) {
   if (p === '/robots.txt') return new Response('User-agent: *\nAllow: /$\nDisallow: /app\nDisallow: /api/\nDisallow: /auth/\n', { headers: { 'content-type': 'text/plain' } });
   const me = await session(req, env);
   if (p.startsWith('/api/')) return me ? api(req, env, url, me) : json(401, { error: 'sign_in' });
+  const pv = p.match(/^\/app\/b\/([\w-]+)\/preview$/);
+  if (pv) {
+    const row = me && await env.DB.prepare('SELECT b.name, d.data FROM businesses b JOIN drafts d ON d.business_id = b.id WHERE b.id = ? AND b.user_id = ?').bind(pv[1], me.id).first();
+    return row ? new Response(landingHtml(row.name, JSON.parse(row.data)), { headers: PREVIEW_HEADERS }) : new Response('Not found', { status: 404 });
+  }
   if (p === '/' || p === '/app' || p.startsWith('/app/')) {
     if (p !== '/' && !me) return new Response(null, { status: 302, headers: { location: '/auth/start' } });
     return html(shell(Boolean(me)));

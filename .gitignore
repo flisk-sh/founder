@@ -5,3 +5,4 @@ dist-worker
 .dev.vars
 .wrangler
 .claude
+.dev.sqlite

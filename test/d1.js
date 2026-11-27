@@ -1,8 +1,8 @@
 // A small D1 stand-in over bun:sqlite, loaded with schema.sql.
 import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
-export function d1() {
-  const db = new Database(':memory:');
+export function d1(file = ':memory:') {
+  const db = new Database(file);
   db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'));
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),

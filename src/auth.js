@@ -26,6 +26,8 @@ export async function sessionCookie(env, who, now = Date.now()) {
 
 export async function authRoute(req, env, url, now = Date.now()) {
   const origin = url.origin, p = url.pathname;
+  const local = env.DEV_LOGIN === '1' && ['localhost', '127.0.0.1'].includes(url.hostname);
+  if (p === '/auth/start' && local) return new Response(null, { status: 302, headers: { location: '/auth/dev?login=demo' } });
   if (p === '/auth/start') {
     const s = rand(16), back = new URL('/auth/done', origin); back.searchParams.set('s', s);
     return new Response(null, { status: 302, headers: { location: `${env.LOGIN_ORIGIN || 'https://login.flisk.si'}/start?return=${encodeURIComponent(back.href)}`, 'set-cookie': cookie(STATE, s, 600) } });
@@ -37,7 +39,7 @@ export async function authRoute(req, env, url, now = Date.now()) {
     return finish(env, { id: `gh_${who.id}`, login: who.login }, now);
   }
   // Local development only: never on a real host, and only when DEV_LOGIN is set.
-  if (p === '/auth/dev' && env.DEV_LOGIN === '1' && ['localhost', '127.0.0.1'].includes(url.hostname)) {
+  if (p === '/auth/dev' && local) {
     const login = (url.searchParams.get('login') || 'dev').replace(/[^A-Za-z0-9-]/g, '').slice(0, 39) || 'dev';
     return finish(env, { id: `dev_${login}`, login }, now);
   }

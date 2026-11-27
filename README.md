@@ -4,6 +4,11 @@
 
 ## What the MVP does
 
+- **Idea to company:** type one sentence. Founder drafts the one-liner, vision, north star, a landing page and the first five tasks. All proposals; the business starts paused.
+- **Chat with your company:** answers about the business and turns requests into proposed tasks. It cannot spend, send or deploy.
+- **Approved tasks run:** research and drafts are done by the model; each result says what was really checked. Builds and deploys say plainly they were not done (fleet is not connected yet).
+- **Website draft:** rendered from escaped data in a sandboxed frame. Not published.
+
 - Sign in with GitHub through [login.flisk.si](https://login.flisk.si). Each person sees only their own businesses; anyone else gets 404.
 - Start a business: claim a name (`<name>.app.flisk.si`, `<name>.flisk.si`, `<name>@app.flisk.si` are reserved; not live yet). It starts **paused**.
 - Scorecard: north star, GEL score, revenue, spend against caps.
@@ -12,7 +17,7 @@
 - **STOP** cancels everything queued. Start needs a north star.
 - Activity log of every decision. Export everything as JSON; delete with the name typed (the name is held 30 days).
 
-Not yet: the AI planner, builds, deploys, mail, payments, ads. Those are the open issues.
+Not yet: real builds and deploys through fleet, mail, payments, ads. Those are the open issues.
 
 ## Safety
 
@@ -26,7 +31,7 @@ Not yet: the AI planner, builds, deploys, mail, payments, ads. Those are the ope
 ```bash
 cd web && bun install && bun run build   # Astryx page -> src/app.generated.js (committed)
 bun test
-bun run dev                              # http://localhost:8799, sign in at /auth/dev?login=you
+bun run dev                              # http://localhost:8799 (INFERENCE_KEY=... for real model drafts)
 ```
 
 ## Deploy (the owner's call)
