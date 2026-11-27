@@ -110,3 +110,14 @@ body{overflow:hidden;display:flex;flex-direction:column}
 .pane.left{display:flex;flex-direction:column;gap:14px}
 .pane.mid{overflow:hidden}.desk .browser{flex:1 1 auto;min-height:120px;display:flex;flex-direction:column}.desk .browser iframe{flex:1;height:auto;min-height:0}
 .controls{flex:0 0 auto}
+/* Follow the active Astryx theme instead of fixed blues and whites. */
+.brand,.msg.user{background:var(--color-accent,#2563eb);color:var(--color-on-accent,#fff)}
+.chip-ic{background:var(--color-accent-muted,#2563eb14);color:var(--color-icon-accent,#2563eb)}
+.chat{background:var(--color-background-muted,#8881)}
+.msg.assistant{background:var(--color-background-card,#fff)}
+.queue-head,.task:hover{background:var(--color-background-muted,#8881)}
+.field select,.add-row select,.theme-pick{background:var(--color-background-card,#fff);color:inherit;border:1px solid var(--color-border,#8886)}
+.theme-pick{height:30px;border-radius:8px;padding:0 8px;font:inherit;font-size:13px}
+.browser{border-color:var(--color-border-emphasized,#8884)}
+.desk-head h2{font-family:var(--font-family-heading,inherit);font-size:24px;letter-spacing:-.01em}
+.stats b{font-family:var(--font-family-heading,inherit)}

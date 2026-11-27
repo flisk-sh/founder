@@ -342,6 +342,9 @@ export default function App() {
           </select></label>}
         {me.businesses.length < 3 && <Button label="New" size="sm" variant={p === '/app/new' ? 'primary' : 'ghost'} icon={ic(PlusIcon)} onClick={() => go('/app/new')} />}
         <span style={{flex: 1}} />
+        <select className="theme-pick" aria-label="Theme" defaultValue={localStorage.getItem('fdr-theme') || 'gothic'} onChange={(e) => { localStorage.setItem('fdr-theme', e.target.value); dispatchEvent(new Event('fdr-theme')); }}>
+          {[['gothic', 'Gothic'], ['chocolate', 'Chocolate'], ['matcha', 'Matcha'], ['neutral', 'Plain']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
         <button className="topbar-link" onClick={() => go('/app/safety')}><Icon icon={LockClosedIcon} size="sm" /><span>Private · how it stays safe</span></button>
         <span className="topbar-user"><Avatar name={me.user.login} size="small" /><span data-flisk-login="">{me.user.login}</span><a href="/auth/out">Sign out</a></span>
       </header>
