@@ -132,47 +132,42 @@ function TaskRow({w, act}) {
   );
 }
 
-function Overview({d, act, run}) {
+function Stats({d}) {
   const b = d.business, total = Math.max(0, Object.values(d.spent).reduce((a, c) => a + c, 0)), capTotal = Object.values(d.caps).reduce((a, c) => a + c, 0);
+  const done = d.work.filter((w) => w.status === 'done').length;
+  return (
+    <div className="stats">
+      <div><small>North star</small><b>0</b><span>{b.north_star || 'not set'}</span></div>
+      <div><small>GEL score</small><b>—</b><span>after first build</span></div>
+      <div><small>Done</small><b>{done}</b><span>of {d.work.length} tasks</span></div>
+      <div><small>Spent</small><b>{money(total)}</b><span>of {money(capTotal)} cap</span></div>
+      <div><small>Revenue</small><b>$0</b><span>no payments yet</span></div>
+    </div>
+  );
+}
+
+function Queue({d, act, run}) {
   const by = (st) => d.work.filter((w) => st.includes(w.status)).sort((x, y) => x.created - y.created);
   const waiting = by(['proposed']), queued = by(['approved', 'running']), done = by(['done', 'failed']), closed = by(['rejected', 'cancelled']);
   const sum = waiting.reduce((a, w) => a + w.cost_usd, 0);
   const [adding, setAdding] = useState(false), [showClosed, setShowClosed] = useState(false);
   const approveAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `Approved ${waiting.length} tasks`);
   return (
-    <div className="ov">
-      <div className="ov-main">
-        <div className="stats">
-          <div><small>North star</small><b>0</b><span>{b.north_star || 'not set'}</span></div>
-          <div><small>GEL score</small><b>—</b><span>after first build</span></div>
-          <div><small>Done</small><b>{done.filter((w) => w.status === 'done').length}</b><span>of {d.work.length} tasks</span></div>
-          <div><small>Spent</small><b>{money(total)}</b><span>of {money(capTotal)} cap</span></div>
-          <div><small>Revenue</small><b>$0</b><span>no payments yet</span></div>
-        </div>
-        <div className="queue">
-          <div className="queue-head">
-            <Text type="emphasized">{waiting.length ? `${waiting.length} waiting for you` : 'Nothing waiting for you'}</Text>
-            {waiting.length > 1 && <Button label={`Approve all · up to ${money(sum)}`} size="sm" variant="primary" icon={ic(CheckIcon)} onClick={approveAll} />}
-            <span style={{flex: 1}} />
-            <IconButton label="Add a task" icon={<Icon icon={PlusIcon} size="sm" />} size="sm" variant="ghost" onClick={() => setAdding(!adding)} />
-          </div>
-          {adding && <ProposeForm d={d} act={act} onDone={() => setAdding(false)} />}
-          {waiting.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
-          {queued.length > 0 && <div className="queue-sub">Approved · runs after Start</div>}
-          {queued.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
-          {done.length > 0 && <div className="queue-sub">Done</div>}
-          {done.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
-          {closed.length > 0 && <button className="queue-sub link" onClick={() => setShowClosed(!showClosed)}>{showClosed ? 'Hide' : 'Show'} {closed.length} rejected or cancelled</button>}
-          {showClosed && closed.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
-        </div>
+    <div className="queue">
+      <div className="queue-head">
+        <Text type="emphasized">{waiting.length ? `${waiting.length} waiting for you` : 'Nothing waiting for you'}</Text>
+        {waiting.length > 1 && <Button label={`Approve all · up to ${money(sum)}`} size="sm" variant="primary" icon={ic(CheckIcon)} onClick={approveAll} />}
+        <span style={{flex: 1}} />
+        <IconButton label="Add a task" icon={<Icon icon={PlusIcon} size="sm" />} size="sm" variant="ghost" onClick={() => setAdding(!adding)} />
       </div>
-      <div className="ov-side">
-        {b.vision && <div className="side-block"><small>Vision</small><Text type="supporting">{b.vision}</Text></div>}
-        <div className="side-block"><small>Activity</small>
-          {d.audit.slice(0, 8).map((a, i) => <div key={i} className="act"><StatusDot variant={a.action === 'failed' || a.action === 'stopped' ? 'error' : a.action === 'done' || a.action === 'approved' ? 'success' : 'neutral'} label={a.action} />
-            <span><b>{a.action}</b> {a.detail.slice(0, 90)} <em>{ago(a.at)}</em></span></div>)}
-        </div>
-      </div>
+      {adding && <ProposeForm d={d} act={act} onDone={() => setAdding(false)} />}
+      {waiting.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {queued.length > 0 && <div className="queue-sub">Approved · runs after Start</div>}
+      {queued.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {done.length > 0 && <div className="queue-sub">Done</div>}
+      {done.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {closed.length > 0 && <button className="queue-sub link" onClick={() => setShowClosed(!showClosed)}>{showClosed ? 'Hide' : 'Show'} {closed.length} rejected or cancelled</button>}
+      {showClosed && closed.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
     </div>
   );
 }
@@ -193,60 +188,51 @@ function ProposeForm({d, act, onDone}) {
 function Website({d}) {
   const b = d.business, [html, setHtml] = useState('');
   useEffect(() => { fetch('/app/b/' + b.id + '/preview').then((r) => (r.ok ? r.text() : '')).then(setHtml).catch(() => setHtml('')); }, [b.id, d.draft?.headline]);
-  if (!d.draft) return <EmptyState title="No site draft" description="Businesses created from an idea get a landing page draft." icon={<Icon icon={GlobeAltIcon} size="lg" />} />;
+  if (!d.draft) return <div className="browser empty"><Text color="secondary">No site draft yet.</Text></div>;
   return (
-    <VStack gap={3}>
-      <div className="row"><HStack gap={2} wrap="wrap"><Badge label={b.name + '.app.flisk.si'} icon={ic(GlobeAltIcon)} /><Badge label="Draft · not published" variant="warning" />{d.draft.offline && <Badge label="Offline draft (no model)" />}</HStack>
-        <Text type="supporting" color="secondary">Publishing needs an approved task and the hosting connection.</Text></div>
-      <div className="browser"><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em></div>
-        <iframe title={'Landing page draft for ' + b.name} srcDoc={html} sandbox="" referrerPolicy="no-referrer" /></div>
-    </VStack>
+    <div className="browser"><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em><b>Draft · not published{d.draft.offline ? ' · offline' : ''}</b></div>
+      <iframe title={'Landing page draft for ' + b.name} srcDoc={html} sandbox="" referrerPolicy="no-referrer" /></div>
   );
 }
 
 function Activity({d}) {
   return (
-    <Card><VStack gap={3}>
-      <VStack gap={1}><Heading level={3}>Everything that happened</Heading><Text type="supporting" color="secondary">Every approval, run, cap change and STOP. Kept until you delete the business.</Text></VStack>
-      <div className="log">{d.audit.map((a, i) => [<Text key={i + 't'} type="supporting" color="secondary">{new Date(a.at).toLocaleString()}</Text>, <Text key={i + 'a'} type="emphasized">{a.action}</Text>, <Text key={i + 'd'}>{a.detail}</Text>])}</div>
-    </VStack></Card>
+    <div className="acts">{d.audit.map((a, i) => <div key={i} className="act"><StatusDot variant={a.action === 'failed' || a.action === 'stopped' ? 'error' : a.action === 'done' || a.action === 'approved' ? 'success' : 'neutral'} label={a.action} />
+      <span><b>{a.action}</b> {a.detail} <em>{ago(a.at)}</em></span></div>)}</div>
   );
 }
 
 function Settings({d, act, onDeleted}) {
   const b = d.business;
   const [caps, setCaps] = useState(Object.fromEntries(Object.entries(d.caps).map(([k, v]) => [k, String(v)])));
-  const [oneLiner, setOneLiner] = useState(b.one_liner), [ns, setNs] = useState(b.north_star), [confirm, setConfirm] = useState(''), [err, setErr] = useState('');
+  const [oneLiner, setOneLiner] = useState(b.one_liner), [ns, setNs] = useState(b.north_star), [confirm, setConfirm] = useState(''), [err, setErr] = useState(''), [deleting, setDeleting] = useState(false);
   const del = async () => { setErr(''); try { await call('/api/businesses/' + b.id, 'DELETE', {confirm}); onDeleted(); } catch (x) { setErr(x.message); } };
+  const dirty = oneLiner !== b.one_liner || ns !== b.north_star || Object.keys(caps).some((k) => Number(caps[k]) !== d.caps[k]);
+  const save = async () => {
+    if (oneLiner !== b.one_liner || ns !== b.north_star) await act('/api/businesses/' + b.id + '/settings', 'PUT', {one_liner: oneLiner, north_star: ns}, 'Saved');
+    if (Object.keys(caps).some((k) => Number(caps[k]) !== d.caps[k])) await act('/api/businesses/' + b.id + '/caps', 'PUT', Object.fromEntries(Object.entries(caps).map(([k, v]) => [k, Number(v)])), 'Saved');
+  };
   return (
-    <VStack gap={4}>
-      <Card><VStack gap={3}>
-        <Heading level={3}>About</Heading>
-        <TextInput label="What it does, in one line" value={oneLiner} onChange={setOneLiner} />
-        <TextInput label="North star metric" value={ns} onChange={setNs} description="Required before Start." />
-        <div><Button label="Save" variant="primary" onClick={() => act('/api/businesses/' + b.id + '/settings', 'PUT', {one_liner: oneLiner, north_star: ns}, 'Saved')} /></div>
-      </VStack></Card>
-      <Card><VStack gap={3}>
-        <Heading level={3}>Monthly caps</Heading>
-        <Text type="supporting" color="secondary">A task over its cap is refused even after approval. $0 turns that spend off.</Text>
-        <div className="caps">{Object.keys(SPEND_LABEL).map((k) => <div key={k}><TextInput label={SPEND_LABEL[k] + ' $'} type="number" value={caps[k]} onChange={(v) => setCaps({...caps, [k]: v})} />
-          <ProgressBar label={'used ' + money(Math.max(0, d.spent[k]))} value={Math.max(0, d.spent[k])} max={Number(caps[k]) || 1} /></div>)}</div>
-        <div><Button label="Save caps" size="sm" variant="primary" onClick={() => act('/api/businesses/' + b.id + '/caps', 'PUT', Object.fromEntries(Object.entries(caps).map(([k, v]) => [k, Number(v)])), 'Caps saved')} /></div>
-      </VStack></Card>
-      <Activity d={d} />
-      <Card><VStack gap={3}>
-        <Heading level={3}>Your data</Heading>
-        <Text color="secondary">Everything Founder keeps about this business, as one JSON file.</Text>
-        <div><Button label="Export" variant="secondary" icon={ic(ArrowDownTrayIcon)} href={'/api/businesses/' + b.id + '/export'} /></div>
-      </VStack></Card>
-      <Card><VStack gap={3}>
-        <Heading level={3}>Delete this business</Heading>
-        <Text color="secondary">Removes its tasks, chat, site draft, spend log, activity and caps. The name {b.name} is held for 30 days so nobody can take over its links or mail.</Text>
-        {err && <Banner status="error" title={err} />}
-        <HStack gap={2} align="end" wrap="wrap"><div style={{width: 240}}><TextInput label={'Type ' + b.name + ' to confirm'} value={confirm} onChange={setConfirm} /></div>
-          <Button label="Delete forever" variant="destructive" icon={ic(TrashIcon)} isDisabled={confirm !== b.name} onClick={del} /></HStack>
-      </VStack></Card>
-    </VStack>
+    <div className="controls">
+      <div className="ctl-row two">
+        <TextInput label="One-liner" value={oneLiner} onChange={setOneLiner} size="sm" />
+        <TextInput label="North star (needed to Start)" value={ns} onChange={setNs} size="sm" />
+      </div>
+      <div className="ctl-row caps">{Object.keys(SPEND_LABEL).map((k) => <div key={k}><TextInput label={SPEND_LABEL[k] + ' cap $'} type="number" value={caps[k]} onChange={(v) => setCaps({...caps, [k]: v})} size="sm" />
+        <ProgressBar label={'used ' + money(Math.max(0, d.spent[k]))} isLabelHidden value={Math.max(0, d.spent[k])} max={Number(caps[k]) || 1} /></div>)}</div>
+      <div className="ctl-foot">
+        <Button label="Save" size="sm" variant="primary" isDisabled={!dirty} onClick={save} />
+        <Text type="supporting" color="secondary">Over a cap is refused even after approval. $0 turns it off.</Text>
+        <span style={{flex: 1}} />
+        <Button label="Export" size="sm" variant="ghost" icon={ic(ArrowDownTrayIcon)} href={'/api/businesses/' + b.id + '/export'} />
+        <Button label="Delete" size="sm" variant="ghost" icon={ic(TrashIcon)} onClick={() => setDeleting(!deleting)} />
+      </div>
+      {deleting && <div className="ctl-foot danger">
+        <div style={{flex: 1}}><TextInput label={'Type ' + b.name + ' to delete everything. The name is held 30 days.'} value={confirm} onChange={setConfirm} size="sm" /></div>
+        <Button label="Delete forever" size="sm" variant="destructive" isDisabled={confirm !== b.name} onClick={del} />
+        {err && <Text color="error">{err}</Text>}
+      </div>}
+    </div>
   );
 }
 
@@ -276,8 +262,6 @@ function Chat({d, reload}) {
 
 function Business({id, onChange, onDeleted}) {
   const [d, setD] = useState(null), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false);
-  const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 1100px)').matches);
-  useEffect(() => { const m = matchMedia('(max-width: 1100px)'), f = () => setNarrow(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
   const load = useCallback(() => call('/api/businesses/' + id).then(setD).catch((x) => setMsg({status: 'error', title: x.message})), [id]);
   useEffect(() => { setD(null); load(); }, [load]);
   const run = async (fn, ok) => { setMsg(null); setBusy(true); try { await fn(); setMsg({status: 'success', title: ok}); await load(); onChange(); } catch (x) { setMsg({status: 'error', title: x.message}); await load(); } finally { setBusy(false); } };
@@ -289,27 +273,29 @@ function Business({id, onChange, onDeleted}) {
   if (!d) return <div className="page">{msg ? <Banner {...msg} /> : <Text color="secondary">Loading…</Text>}</div>;
   const b = d.business, [dot, label] = STATUS[b.status] || STATUS.paused, waiting = d.work.filter((w) => w.status === 'proposed').length;
   return (
-    <div className="biz">
-      <div className="biz-main"><div className="page wide"><VStack gap={3}>
-        <div className="row">
-          <VStack gap={1}>
-            <HStack gap={2} align="center"><Heading level={1}>{b.name}</Heading><Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} /></HStack>
-            <Text color="secondary">{b.one_liner || 'No one-liner yet.'}</Text>
-            <HStack gap={2} wrap="wrap"><Badge label={b.name + '.app.flisk.si'} icon={ic(GlobeAltIcon)} /><Badge label={b.name + '@app.flisk.si'} icon={ic(EnvelopeIcon)} /></HStack>
-          </VStack>
-          {b.status === 'active'
-            ? <Button label="STOP everything" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={() => act('/api/businesses/' + b.id + '/stop', 'POST', {}, 'Stopped. Everything queued was cancelled.')} />
-            : <Button label={waiting ? 'Start' : 'Start'} variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={() => act('/api/businesses/' + b.id + '/start', 'POST', {}, 'Started. Approved tasks can run now.')} />}
-        </div>
-        {busy && <ProgressBar label="Working" isLabelHidden isIndeterminate />}
-        {msg && <Banner {...msg} isDismissable onDismiss={() => setMsg(null)} />}
-        {/* One page, no tabs: work, then the site, then settings. On a narrow screen the chat sits under the work. */}
-        <Overview d={d} act={act} run={run} />
-        {narrow && <div className="chat-inline"><Chat d={d} reload={load} /></div>}
-        <section className="sec"><h2>Website</h2><Website d={d} /></section>
-        <section className="sec"><h2>Settings</h2><Settings key={JSON.stringify(d.caps)} d={d} act={act} onDeleted={onDeleted} /></section>
-      </VStack></div></div>
-      <aside className="biz-chat"><Chat d={d} reload={load} /></aside>
+    <div className="desk">
+      <div className="desk-head">
+        <Heading level={2}>{b.name}</Heading>
+        <Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} />
+        <Text color="secondary" className="one">{b.one_liner || 'No one-liner yet.'}</Text>
+        <span style={{flex: 1}} />
+        <Badge label={b.name + '@app.flisk.si'} icon={ic(EnvelopeIcon)} />
+        {b.status === 'active'
+          ? <Button label="STOP everything" size="sm" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={() => act('/api/businesses/' + b.id + '/stop', 'POST', {}, 'Stopped. Everything queued was cancelled.')} />
+          : <Button label={waiting ? 'Start' : 'Start'} size="sm" variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={() => act('/api/businesses/' + b.id + '/start', 'POST', {}, 'Started. Approved tasks can run now.')} />}
+      </div>
+      {msg && <Banner {...msg} isDismissable onDismiss={() => setMsg(null)} />}
+      {busy && <ProgressBar label="Working" isLabelHidden isIndeterminate />}
+      <Stats d={d} />
+      {/* Everything on one screen: tasks | site, settings, activity | chat. Only a pane scrolls, never the page. */}
+      <div className="desk-grid">
+        <section className="pane left"><Queue d={d} act={act} run={run} /><div className="pane-sub"><small>Activity</small><Activity d={d} /></div></section>
+        <section className="pane mid">
+          <Website d={d} />
+          <Settings key={JSON.stringify(d.caps) + b.one_liner + b.north_star} d={d} act={act} onDeleted={onDeleted} />
+        </section>
+        <aside className="pane chat-pane"><Chat d={d} reload={load} /></aside>
+      </div>
     </div>
   );
 }

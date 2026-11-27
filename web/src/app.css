@@ -85,3 +85,28 @@ body{overflow:hidden;display:flex;flex-direction:column}
 .sec h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;opacity:.6;margin:0}
 .chat-inline{height:420px}
 .browser iframe{height:420px}
+
+/* One screen, no page scroll: header, stats, then three panes that scroll inside. */
+.app-main:has(.desk){overflow:hidden}
+.desk{height:100%;display:flex;flex-direction:column;gap:10px;padding:12px 16px;box-sizing:border-box;min-height:0}
+.desk-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.desk-head h2{margin:0;font-size:20px}
+.desk-head .one{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px}
+.desk .stats{margin:0}
+.desk-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 340px;gap:12px}
+.pane{min-height:0;overflow:auto;border:1px solid var(--color-border,#8883);border-radius:12px;padding:10px}
+.pane.mid{display:flex;flex-direction:column;gap:10px}
+.pane.chat-pane{padding:0;overflow:hidden;display:flex}.pane.chat-pane .chat{flex:1;border-radius:12px}
+.desk .browser{flex:0 0 auto}.desk .browser iframe{height:300px}
+.browser-bar b{margin-left:auto;font-size:11px;font-weight:500;color:#b45309}
+.browser.empty{display:grid;place-items:center;height:120px}
+.controls{display:grid;gap:8px}
+.ctl-row{display:grid;gap:8px}.ctl-row.two{grid-template-columns:1fr 1fr}.ctl-row.caps{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ctl-row.caps>div{display:grid;gap:4px}
+.ctl-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ctl-foot.danger{align-items:end;padding:8px;border:1px solid #fca5a5;border-radius:10px}
+.pane-sub{display:grid;gap:6px}.pane-sub small{font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.6}
+.acts{display:grid;gap:6px}
+@media (max-width:1100px){.app-main:has(.desk){overflow:auto}.desk{height:auto}.desk-grid{grid-template-columns:1fr}.pane{overflow:visible}.pane.chat-pane{height:480px}}
+.pane.left{display:flex;flex-direction:column;gap:14px}
+.pane.mid{overflow:hidden}.desk .browser{flex:1 1 auto;min-height:120px;display:flex;flex-direction:column}.desk .browser iframe{flex:1;height:auto;min-height:0}
+.controls{flex:0 0 auto}
