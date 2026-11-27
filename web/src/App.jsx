@@ -10,7 +10,6 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {ProgressBar} from '@astryxdesign/core/ProgressBar';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
-import {TabList, Tab} from '@astryxdesign/core/TabList';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Markdown} from '@astryxdesign/core/Markdown';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
@@ -276,11 +275,11 @@ function Chat({d, reload}) {
 }
 
 function Business({id, onChange, onDeleted}) {
-  const [d, setD] = useState(null), [tab, setTab] = useState('overview'), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false);
+  const [d, setD] = useState(null), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false);
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 1100px)').matches);
   useEffect(() => { const m = matchMedia('(max-width: 1100px)'), f = () => setNarrow(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
   const load = useCallback(() => call('/api/businesses/' + id).then(setD).catch((x) => setMsg({status: 'error', title: x.message})), [id]);
-  useEffect(() => { setD(null); setTab('overview'); load(); }, [load]);
+  useEffect(() => { setD(null); load(); }, [load]);
   const run = async (fn, ok) => { setMsg(null); setBusy(true); try { await fn(); setMsg({status: 'success', title: ok}); await load(); onChange(); } catch (x) { setMsg({status: 'error', title: x.message}); await load(); } finally { setBusy(false); } };
   const act = async (url, method, body, ok) => {
     setMsg(null); setBusy(true);
@@ -304,13 +303,11 @@ function Business({id, onChange, onDeleted}) {
         </div>
         {busy && <ProgressBar label="Working" isLabelHidden isIndeterminate />}
         {msg && <Banner {...msg} isDismissable onDismiss={() => setMsg(null)} />}
-        <TabList value={tab} onChange={setTab} hasDivider>
-          <Tab value="overview" label="Work" /><Tab value="site" label="Website" />{narrow && <Tab value="chat-m" label="Chat" />}<Tab value="settings" label="Settings" />
-        </TabList>
-        {tab === 'overview' && <Overview d={d} act={act} run={run} />}
-        {tab === 'site' && <Website d={d} />}
-        {tab === 'chat-m' && <div className="chat-inline"><Chat d={d} reload={load} /></div>}
-        {tab === 'settings' && <Settings key={JSON.stringify(d.caps)} d={d} act={act} onDeleted={onDeleted} />}
+        {/* One page, no tabs: work, then the site, then settings. On a narrow screen the chat sits under the work. */}
+        <Overview d={d} act={act} run={run} />
+        {narrow && <div className="chat-inline"><Chat d={d} reload={load} /></div>}
+        <section className="sec"><h2>Website</h2><Website d={d} /></section>
+        <section className="sec"><h2>Settings</h2><Settings key={JSON.stringify(d.caps)} d={d} act={act} onDeleted={onDeleted} /></section>
       </VStack></div></div>
       <aside className="biz-chat"><Chat d={d} reload={load} /></aside>
     </div>

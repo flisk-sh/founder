@@ -81,3 +81,7 @@ body{overflow:hidden;display:flex;flex-direction:column}
 @media (max-width:700px){.topbar-link span,.topbar-user [data-flisk-login]{display:none}}
 .app-main{flex:1;min-height:0;overflow:auto}
 .app-main>.biz{height:100%}
+.sec{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--color-border,#8883)}
+.sec h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;opacity:.6;margin:0}
+.chat-inline{height:420px}
+.browser iframe{height:420px}
