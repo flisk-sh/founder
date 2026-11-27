@@ -15,15 +15,28 @@ import {Markdown} from '@astryxdesign/core/Markdown';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Avatar} from '@astryxdesign/core/Avatar';
 import {IconButton} from '@astryxdesign/core/IconButton';
+import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
+import {ContextMenu} from '@astryxdesign/core/ContextMenu';
+import {HoverCard} from '@astryxdesign/core/HoverCard';
+import {Tooltip} from '@astryxdesign/core/Tooltip';
+import {CommandPalette} from '@astryxdesign/core/CommandPalette';
+import {createStaticSource} from '@astryxdesign/core/Typeahead';
+import {Drawer, DrawerHeader} from '@astryxdesign/core/Drawer';
+import {useToast} from '@astryxdesign/core/Toast';
+import {Kbd} from '@astryxdesign/core/Kbd';
+import {useHotkeys} from '@astryxdesign/core/hooks';
 import {
   ArrowDownTrayIcon, ArrowRightIcon, ArrowUpIcon, BanknotesIcon, BoltIcon, BuildingStorefrontIcon, ChartBarIcon, ChatBubbleLeftRightIcon, CheckCircleIcon,
   CheckIcon, ClipboardDocumentListIcon, ClockIcon, EnvelopeIcon, ExclamationTriangleIcon, GlobeAltIcon, LightBulbIcon, LockClosedIcon, PlayIcon,
-  PlusIcon, ShieldCheckIcon, SparklesIcon, StopIcon, TrashIcon, XMarkIcon,
+  PlusIcon, ShieldCheckIcon, SparklesIcon, StopIcon, TrashIcon, XMarkIcon, EllipsisHorizontalIcon, MagnifyingGlassIcon, PencilSquareIcon,
+  ClipboardIcon, ChatBubbleOvalLeftIcon, ArrowsPointingOutIcon, InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 
 // founder.flisk.si cabinet. Founder drafts and proposes; the owner approves every task and every dollar.
 const ic = (I) => <Icon icon={I} size="sm" />;
 const money = (n) => '$' + Number(n || 0).toFixed(2).replace(/\.00$/, '');
+// Owner-facing log line: the stored record keeps the approval hash and spend kind; people only need the job.
+const plain = (t) => String(t || '').replace(/\s*\(up to [^)]*\)/, '');
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
 const ERR = {
   name_invalid: 'Use only small letters, numbers and dashes, like marios-pizza.', name_reserved: 'That name is not available. Please pick another.',
@@ -108,29 +121,47 @@ function Onboard({onCreated}) {
 }
 
 // ---------- business pieces ----------
-function TaskRow({w, act}) {
+function TaskRow({w, act, ask}) {
   const [open, setOpen] = useState(false);
   const st = {proposed: null, approved: ['You said yes', 'blue'], running: ['Working…', 'blue'], done: ['Done', 'success'], failed: ['Did not work', 'error'], rejected: ['You said no', 'neutral'], cancelled: ['Stopped', 'neutral']}[w.status];
-  const hasMore = w.body || w.result || w.verified;
+  const yes = () => act('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}, 'You said yes to “' + w.title + '”');
+  const no = () => act('/api/work/' + w.id + '/reject', 'POST', {}, 'You said no to “' + w.title + '”');
+  const now = () => act('/api/work/' + w.id + '/run', 'POST', {}, 'Done: ' + w.title);
+  const items = [
+    ...(w.status === 'proposed' ? [{label: 'Yes, do this', icon: CheckIcon, onClick: yes}, {label: 'No, skip it', icon: XMarkIcon, onClick: no}, {type: 'divider'}] : []),
+    ...(w.status === 'approved' ? [{label: 'Do it now', icon: PlayIcon, onClick: now}, {type: 'divider'}] : []),
+    {label: 'Ask the assistant about it', icon: ChatBubbleOvalLeftIcon, onClick: () => ask('About the job “' + w.title + '”: ')},
+    {label: open ? 'Hide details' : 'Show details', icon: InformationCircleIcon, onClick: () => setOpen(!open)},
+    {label: 'Copy', icon: ClipboardIcon, onClick: () => navigator.clipboard?.writeText(w.title + (w.result ? '\n\n' + w.result : ''))},
+  ];
+  const card = <VStack gap={2} style={{maxWidth: 320, padding: 4}}>
+    <Text type="emphasized">{w.title}</Text>
+    {w.body && <Text type="supporting" color="secondary">{w.body}</Text>}
+    <Text type="supporting">Costs at most <b>{money(w.cost_usd)}</b> · suggested by {w.source === 'owner' ? 'you' : 'your assistant'}</Text>
+    <Text type="supporting" color="secondary">Right-click for more</Text>
+  </VStack>;
   return (
-    <div className={'task ' + w.status}>
-      <div className="task-line">
-        <span className="chip-ic sm"><Icon icon={KIND_ICON[w.kind] || BoltIcon} size="sm" /></span>
-        <button className="task-title" onClick={() => setOpen(!open)} disabled={!hasMore}>{w.title}</button>
-        <span className="cost">{money(w.cost_usd)}</span>
-        {w.status === 'proposed' && <span className="task-act">
-          <Button label="Yes" icon={ic(CheckIcon)} size="sm" variant="primary" onClick={() => act('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}, 'You said yes')} />
-          <Button label="No" size="sm" variant="secondary" onClick={() => act('/api/work/' + w.id + '/reject', 'POST', {}, 'You said no')} /></span>}
-        {w.status === 'approved' && <Button label="Do it now" size="sm" variant="secondary" icon={ic(PlayIcon)} onClick={() => act('/api/work/' + w.id + '/run', 'POST', {}, 'Done')} />}
-        {st && w.status !== 'approved' && <Badge label={st[0]} variant={st[1]} />}
+    <ContextMenu label={'Actions for ' + w.title} items={items}>
+      <div className={'task ' + w.status}>
+        <div className="task-line">
+          <span className="chip-ic sm"><Icon icon={KIND_ICON[w.kind] || BoltIcon} size="sm" /></span>
+          <HoverCard content={card} placement="left" delay={350}>
+            <button className="task-title" onClick={() => setOpen(!open)}>{w.title}</button>
+          </HoverCard>
+          <span className="cost">{money(w.cost_usd)}</span>
+          {w.status === 'proposed' && <span className="task-act">
+            <Button label="Yes" icon={ic(CheckIcon)} size="sm" variant="primary" onClick={yes} />
+            <Button label="No" size="sm" variant="secondary" onClick={no} /></span>}
+          {w.status === 'approved' && <Button label="Do it now" size="sm" variant="secondary" icon={ic(PlayIcon)} onClick={now} />}
+          {st && w.status !== 'approved' && <Badge label={st[0]} variant={st[1]} />}
+        </div>
+        {open && <div className="task-more">
+          {w.body && <Text type="supporting" color="secondary">{w.body}</Text>}
+          {w.result && <div className="result"><Markdown density="compact">{w.result}</Markdown></div>}
+          {w.verified && <Text type="supporting"><b>Good to know:</b> {w.verified}</Text>}
+        </div>}
       </div>
-      {open && <div className="task-more">
-        {w.body && <Text type="supporting" color="secondary">{w.body}</Text>}
-        {w.result && <div className="result"><Markdown density="compact">{w.result}</Markdown></div>}
-        {w.verified && <Text type="supporting"><b>Good to know:</b> {w.verified}</Text>}
-        <Text type="supporting" color="secondary">Suggested by {w.source === 'owner' ? 'you' : 'your assistant'} · costs at most {money(w.cost_usd)}</Text>
-      </div>}
-    </div>
+    </ContextMenu>
   );
 }
 
@@ -147,11 +178,11 @@ function Stats({d}) {
   );
 }
 
-function Queue({d, act, run}) {
+function Queue({d, act, run, ask, adding, setAdding}) {
   const by = (st) => d.work.filter((w) => st.includes(w.status)).sort((x, y) => x.created - y.created);
   const waiting = by(['proposed']), queued = by(['approved', 'running']), done = by(['done', 'failed']), closed = by(['rejected', 'cancelled']);
   const sum = waiting.reduce((a, w) => a + w.cost_usd, 0);
-  const [adding, setAdding] = useState(false), [showClosed, setShowClosed] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
   const approveAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${waiting.length} jobs`);
   return (
     <div className="queue">
@@ -162,13 +193,13 @@ function Queue({d, act, run}) {
         <Button label="Add a job" icon={ic(PlusIcon)} size="sm" variant="ghost" onClick={() => setAdding(!adding)} />
       </div>
       {adding && <ProposeForm d={d} act={act} onDone={() => setAdding(false)} />}
-      {waiting.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {waiting.map((w) => <TaskRow key={w.id} w={w} act={act} ask={ask} />)}
       {queued.length > 0 && <div className="queue-sub">You said yes · starts when you press Start</div>}
-      {queued.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {queued.map((w) => <TaskRow key={w.id} w={w} act={act} ask={ask} />)}
       {done.length > 0 && <div className="queue-sub">Done</div>}
-      {done.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {done.map((w) => <TaskRow key={w.id} w={w} act={act} ask={ask} />)}
       {closed.length > 0 && <button className="queue-sub link" onClick={() => setShowClosed(!showClosed)}>{showClosed ? 'Hide' : 'Show'} {closed.length} you said no to</button>}
-      {showClosed && closed.map((w) => <TaskRow key={w.id} w={w} act={act} />)}
+      {showClosed && closed.map((w) => <TaskRow key={w.id} w={w} act={act} ask={ask} />)}
     </div>
   );
 }
@@ -185,20 +216,20 @@ function ProposeForm({d, act, onDone}) {
   );
 }
 
-function Website({d}) {
+function Website({d, big}) {
   const b = d.business, [html, setHtml] = useState('');
   useEffect(() => { fetch('/app/b/' + b.id + '/preview').then((r) => (r.ok ? r.text() : '')).then(setHtml).catch(() => setHtml('')); }, [b.id, d.draft?.headline]);
   if (!d.draft) return <div className="browser empty"><Text color="secondary">No web page yet.</Text></div>;
   return (
-    <div className="browser"><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em><b>Draft · not online yet</b></div>
-      <iframe title={'Landing page draft for ' + b.name} srcDoc={html} sandbox="" referrerPolicy="no-referrer" /></div>
+    <div className={'browser' + (big ? ' big' : '')}><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em><b>Draft · not online yet</b></div>
+      <iframe title={'Web page draft for ' + b.name} srcDoc={html} sandbox="" referrerPolicy="no-referrer" /></div>
   );
 }
 
 function Activity({d}) {
   return (
     <div className="acts">{d.audit.map((a, i) => <div key={i} className="act"><StatusDot variant={a.action === 'failed' || a.action === 'stopped' ? 'error' : a.action === 'done' || a.action === 'approved' ? 'success' : 'neutral'} label={a.action} />
-      <span><b>{DID[a.action] || a.action}</b> {a.detail} <em>{ago(a.at)}</em></span></div>)}</div>
+      <span><b>{DID[a.action] || a.action}</b> {plain(a.detail)} <em>{ago(a.at)}</em></span></div>)}</div>
   );
 }
 
@@ -236,65 +267,140 @@ function Settings({d, act, onDeleted}) {
   );
 }
 
-function Chat({d, reload}) {
-  const [text, setText] = useState(''), [busy, setBusy] = useState(false), [pending, setPending] = useState(''), end = useRef(null);
-  useEffect(() => { end.current?.scrollIntoView({block: 'end'}); }, [d.messages.length, pending]);
-  const send = async (e) => {
-    e?.preventDefault(); const t = text.trim(); if (!t || busy) return;
+const SUGGEST = ['Write a summer menu', 'Ideas for a lunch deal', 'Answer a bad review politely', 'Plan a small opening party'];
+function Chat({d, reload, text, setText, inputRef}) {
+  const [busy, setBusy] = useState(false), [pending, setPending] = useState(''), end = useRef(null);
+  const timeline = [...d.messages.map((m) => ({...m, t: 'm'})), ...d.audit.filter((a) => a.action !== 'created').map((a) => ({...a, t: 'a'}))].sort((x, y) => x.at - y.at);
+  useEffect(() => { end.current?.scrollIntoView({block: 'end'}); }, [timeline.length, pending]);
+  const send = async (e, t0) => {
+    e?.preventDefault(); const t = (t0 ?? text).trim(); if (!t || busy) return;
     setBusy(true); setPending(t); setText('');
     try { await call('/api/businesses/' + d.business.id + '/chat', 'POST', {text: t}); await reload(); } catch (x) { setText(t); alert(x.message); } finally { setBusy(false); setPending(''); }
   };
+  const asked = d.messages.filter((m) => m.role === 'user').length;
   return (
     <div className="chat">
-      <HStack gap={2} align="center" style={{padding: '12px 14px', borderBottom: '1px solid var(--color-border, #8883)'}}><Avatar name="Assistant" size="small" /><VStack gap={0}><Text type="emphasized">Your assistant</Text><Text type="supporting" color="secondary">Suggests jobs, never acts on its own</Text></VStack></HStack>
       <div className="chat-log">
-        {d.messages.map((m, i) => <div key={i} className={'msg ' + m.role}>{m.role === 'assistant' ? <Markdown density="compact">{m.content}</Markdown> : m.content}</div>)}
+        {timeline.map((m, i) => m.t === 'a'
+          ? <div key={i} className="sys"><StatusDot variant={m.action === 'failed' || m.action === 'stopped' ? 'error' : m.action === 'done' || m.action === 'approved' ? 'success' : 'neutral'} label={m.action} /><b>{DID[m.action] || m.action}</b><span>{plain(m.detail)}</span><em>{ago(m.at)}</em></div>
+          : <div key={i} className={'msg ' + m.role}>{m.role === 'assistant' ? <Markdown density="compact">{m.content}</Markdown> : m.content}</div>)}
         {pending && <><div className="msg user">{pending}</div><div className="msg assistant"><Text color="secondary">Writing…</Text></div></>}
         <div ref={end} />
       </div>
+      {asked < 3 && <div className="suggest">{SUGGEST.map((x) => <Button key={x} label={x} size="sm" variant="secondary" onClick={() => send(null, x)} isDisabled={busy} />)}</div>}
       <form onSubmit={send} className="chat-in">
-        <TextArea label="Message your assistant" isLabelHidden value={text} onChange={setText} rows={2} placeholder="Ask a question, or say “write a summer menu”" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
+        <TextArea ref={inputRef} label="Message your assistant" isLabelHidden value={text} onChange={setText} rows={2} placeholder="Ask a question, or say “write a summer menu”" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
         <Button label="Send" variant="primary" type="submit" isDisabled={busy || !text.trim()} icon={ic(ArrowUpIcon)} />
       </form>
     </div>
   );
 }
 
-function Business({id, onChange, onDeleted}) {
-  const [d, setD] = useState(null), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false);
-  const load = useCallback(() => call('/api/businesses/' + id).then(setD).catch((x) => setMsg({status: 'error', title: x.message})), [id]);
+function Business({id, onChange, onDeleted, businesses, go}) {
+  const [d, setD] = useState(null), [busy, setBusy] = useState(false), [drawer, setDrawer] = useState(''), [palette, setPalette] = useState(false);
+  const [text, setText] = useState(''), [adding, setAdding] = useState(false), inputRef = useRef(null), toast = useToast();
+  const say = (body) => toast({body, autoHideDuration: 4000});
+  const load = useCallback(() => call('/api/businesses/' + id).then(setD).catch((x) => say(x.message)), [id]);
   useEffect(() => { setD(null); load(); }, [load]);
-  const run = async (fn, ok) => { setMsg(null); setBusy(true); try { await fn(); setMsg({status: 'success', title: ok}); await load(); onChange(); } catch (x) { setMsg({status: 'error', title: x.message}); await load(); } finally { setBusy(false); } };
+  const run = async (fn, ok) => { setBusy(true); try { await fn(); say(ok); } catch (x) { say(x.message); } finally { await load(); onChange(); setBusy(false); } };
   const act = async (url, method, body, ok) => {
-    setMsg(null); setBusy(true);
-    try { const j = await call(url, method, body); setMsg({status: 'success', title: j.note ? ok + '. ' + j.note : j.status === 'failed' ? 'It did not work. Open the job to see why.' : ok}); await load(); onChange(); return true; }
-    catch (x) { setMsg({status: 'error', title: x.message}); return false; } finally { setBusy(false); }
+    setBusy(true);
+    try { const j = await call(url, method, body); say(j.note ? ok + '. ' + j.note : j.status === 'failed' ? 'It did not work. Open the job to see why.' : ok); await load(); onChange(); return true; }
+    catch (x) { say(x.message); return false; } finally { setBusy(false); }
   };
-  if (!d) return <div className="page">{msg ? <Banner {...msg} /> : <Text color="secondary">Loading…</Text>}</div>;
-  const b = d.business, [dot, label] = STATUS[b.status] || STATUS.paused, waiting = d.work.filter((w) => w.status === 'proposed').length;
+  const ask = (t) => { setText(t); setTimeout(() => inputRef.current?.focus?.(), 50); };
+  useHotkeys([
+    {keys: 'mod+k', allowInInputs: true, onPress: () => setPalette((x) => !x)},
+    {keys: '/', onPress: () => inputRef.current?.focus?.()},
+  ]);
+  if (!d) return <div className="page"><Text color="secondary">Loading…</Text></div>;
+  const b = d.business, [dot, label] = STATUS[b.status] || STATUS.paused;
+  const waiting = d.work.filter((w) => w.status === 'proposed'), done = d.work.filter((w) => w.status === 'done').length;
+  const spent = Math.max(0, Object.values(d.spent).reduce((x, c) => x + c, 0)), limit = Object.values(d.caps).reduce((x, c) => x + c, 0);
+  const start = () => act('/api/businesses/' + b.id + '/start', 'POST', {}, 'Started. The jobs you said yes to will now be done.');
+  const stop = () => act('/api/businesses/' + b.id + '/stop', 'POST', {}, 'Stopped. Nothing else will happen.');
+  const yesAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${waiting.length} jobs`);
+  const setCap = (k, v) => act('/api/businesses/' + b.id + '/caps', 'PUT', {...d.caps, [k]: v}, `${SPEND_LABEL[k]} limit is now ${money(v)} a month`);
+  const copyAddr = () => { navigator.clipboard?.writeText('https://' + b.name + '.app.flisk.si'); say('Address copied'); };
+  const download = () => { location.href = '/api/businesses/' + b.id + '/export'; };
+  // The next useful thing to do, instead of a row of zeros.
+  const next = b.status === 'stopped' ? 'Everything is stopped. Press Start when you want to go on.'
+    : !b.north_star ? 'Next: tell us how you measure success (⋯ → Details).'
+    : waiting.length && b.status !== 'active' ? `Next: say yes to the jobs you like, then press Start.`
+    : waiting.length ? `${waiting.length} jobs wait for your answer.`
+    : b.status !== 'active' ? 'Next: press Start.' : 'All set. Ask your assistant for the next idea.';
+  const menu = [
+    {label: 'Your web page', description: 'Draft, not online yet', icon: GlobeAltIcon, items: [
+      {label: 'Open it big', icon: ArrowsPointingOutIcon, onClick: () => setDrawer('site')},
+      {label: 'Copy its address', icon: ClipboardIcon, onClick: copyAddr},
+    ]},
+    {label: 'Monthly limits', description: 'The most it may spend', icon: BanknotesIcon, items: Object.keys(SPEND_LABEL).map((k) => ({
+      label: SPEND_LABEL[k], description: 'Now ' + money(d.caps[k]) + ' a month', items: [0, 5, 10, 25, 50, 100].map((v) => ({label: v === 0 ? 'Off ($0)' : money(v), endContent: v === d.caps[k] ? <Icon icon={CheckIcon} size="sm" /> : null, onClick: () => setCap(k, v)})),
+    }))},
+    {label: 'Details', description: 'Name, sentence, how you measure success', icon: PencilSquareIcon, onClick: () => setDrawer('details')},
+    {label: 'What happened', icon: ClockIcon, onClick: () => setDrawer('history')},
+    {type: 'divider'},
+    {label: 'Download my data', icon: ArrowDownTrayIcon, onClick: download},
+    {label: 'Delete this business…', icon: TrashIcon, variant: 'destructive', onClick: () => setDrawer('details')},
+  ];
+  const cmds = [
+    waiting.length > 1 && {id: 'yes-all', label: `Say yes to all ${waiting.length} jobs`, run: yesAll},
+    b.status === 'active' ? {id: 'stop', label: 'STOP everything', run: stop} : {id: 'start', label: 'Start', run: start},
+    {id: 'add', label: 'Add a job', run: () => setAdding(true)},
+    {id: 'ask', label: 'Ask your assistant', run: () => ask('')},
+    ...waiting.map((w) => ({id: 'yes:' + w.id, label: 'Yes: ' + w.title, run: () => act('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}, 'You said yes')})),
+    {id: 'site', label: 'Open your web page', run: () => setDrawer('site')},
+    {id: 'details', label: 'Change details', run: () => setDrawer('details')},
+    {id: 'limits', label: 'Change monthly limits', run: () => setDrawer('details')},
+    {id: 'history', label: 'See what happened', run: () => setDrawer('history')},
+    {id: 'download', label: 'Download my data', run: download},
+    ...businesses.filter((x) => x.id !== b.id).map((x) => ({id: 'go:' + x.id, label: 'Go to ' + x.name, run: () => go('/app/b/' + x.id)})),
+    businesses.length < 3 && {id: 'new', label: 'Add a business', run: () => go('/app/new')},
+    {id: 'safe', label: 'How we keep you safe', run: () => go('/app/safety')},
+  ].filter(Boolean);
+  const source = createStaticSource(cmds.map(({id, label}) => ({id, label})));
   return (
-    <div className="desk">
-      <div className="desk-head">
+    <div className="work">
+      <header className="work-head">
         <Heading level={2}>{b.name}</Heading>
-        <Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} />
+        <HoverCard placement="below" content={<VStack gap={1} style={{maxWidth: 280, padding: 4}}><Text type="emphasized">{label}</Text><Text type="supporting" color="secondary">{b.status === 'active' ? 'Jobs you said yes to are being done. Press STOP to halt everything.' : b.status === 'stopped' ? 'Nothing happens until you press Start.' : 'Nothing happens until you press Start. Say yes to jobs first.'}</Text></VStack>}>
+          <span><Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} /></span>
+        </HoverCard>
         <Text color="secondary" className="one">{b.one_liner || ''}</Text>
         <span style={{flex: 1}} />
+        {done > 0 && <Badge label={`${done} done`} variant="success" />}
+        {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={`${money(spent)} of ${money(limit)}`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
+        <Button label="Search and do anything" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} />
         {b.status === 'active'
-          ? <Button label="STOP everything" size="sm" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={() => act('/api/businesses/' + b.id + '/stop', 'POST', {}, 'Stopped. Nothing else will happen.')} />
-          : <Button label={waiting ? 'Start' : 'Start'} size="sm" variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={() => act('/api/businesses/' + b.id + '/start', 'POST', {}, 'Started. The jobs you said yes to will now be done.')} />}
+          ? <Button label="STOP everything" size="sm" variant="destructive" icon={ic(StopIcon)} isDisabled={busy} onClick={stop} />
+          : <Button label="Start" size="sm" variant="primary" icon={ic(PlayIcon)} isDisabled={busy} onClick={start} />}
+        <DropdownMenu button={{label: 'More', variant: 'ghost', size: 'sm', isIconOnly: true, icon: <Icon icon={EllipsisHorizontalIcon} size="sm" />}} items={menu} alignment="end" />
+      </header>
+      <div className="next"><Icon icon={LightBulbIcon} size="sm" /><span>{next}</span>{busy && <span className="busy">Working…</span>}</div>
+      <div className="work-grid">
+        <section className="work-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></section>
+        <aside className="work-rail">
+          <Queue d={d} act={act} run={run} ask={ask} adding={adding} setAdding={setAdding} />
+          <button className="site-thumb" onClick={() => setDrawer('site')} aria-label="Open your web page">
+            <Website d={d} /><span className="site-open"><Icon icon={ArrowsPointingOutIcon} size="sm" /> Open your web page</span>
+          </button>
+        </aside>
       </div>
-      {msg && <Banner {...msg} isDismissable onDismiss={() => setMsg(null)} />}
-      {busy && <ProgressBar label="Working" isLabelHidden isIndeterminate />}
-      <Stats d={d} />
-      {/* Everything on one screen: tasks | site, settings, activity | chat. Only a pane scrolls, never the page. */}
-      <div className="desk-grid">
-        <section className="pane left"><Queue d={d} act={act} run={run} /><div className="pane-sub"><small>What happened</small><Activity d={d} /></div></section>
-        <section className="pane mid">
-          <Website d={d} />
-          <Settings key={JSON.stringify(d.caps) + b.one_liner + b.north_star} d={d} act={act} onDeleted={onDeleted} />
-        </section>
-        <aside className="pane chat-pane"><Chat d={d} reload={load} /></aside>
-      </div>
+      <CommandPalette isOpen={palette} onOpenChange={setPalette} label="Search and do anything" searchSource={source} value="" emptySearchText="Nothing found. Try “yes”, “limit” or “page”."
+        onValueChange={(v) => { const c = cmds.find((x) => x.id === v); setPalette(false); c && c.run(); }} />
+      <Drawer isOpen={drawer === 'details'} onOpenChange={(o) => !o && setDrawer('')} label="Details and limits" side="end" width={520}>
+        <DrawerHeader title="Details and limits" subtitle="What you do, how you measure success, what it may spend" onOpenChange={(o) => !o && setDrawer('')} hasDivider />
+        <div style={{padding: 16}}><Settings key={JSON.stringify(d.caps) + b.one_liner + b.north_star} d={d} act={act} onDeleted={onDeleted} /></div>
+      </Drawer>
+      <Drawer isOpen={drawer === 'site'} onOpenChange={(o) => !o && setDrawer('')} label="Your web page" side="end" width="min(1000px, 92vw)">
+        <DrawerHeader title="Your web page" subtitle="A draft. It goes online only after you say yes to that job." onOpenChange={(o) => !o && setDrawer('')} hasDivider
+          endContent={<Button label="Copy address" size="sm" variant="ghost" icon={ic(ClipboardIcon)} onClick={copyAddr} />} />
+        <div style={{padding: 16, height: 'calc(100% - 80px)'}}><Website d={d} big /></div>
+      </Drawer>
+      <Drawer isOpen={drawer === 'history'} onOpenChange={(o) => !o && setDrawer('')} label="What happened" side="end" width={480}>
+        <DrawerHeader title="What happened" subtitle="Every yes, no, start, stop and change. Kept until you delete the business." onOpenChange={(o) => !o && setDrawer('')} hasDivider />
+        <div style={{padding: 16}}><Activity d={d} /></div>
+      </Drawer>
     </div>
   );
 }
@@ -324,7 +430,7 @@ export default function App() {
   const firstId = me.businesses[0]?.id;
   const shownId = bid || (p !== '/app/new' && p !== '/app/safety' ? firstId : '');
   const view = p === '/app/safety' ? <Safety />
-    : shownId ? <Business key={shownId} id={shownId} onChange={loadMe} onDeleted={async () => { await loadMe(); go('/app'); }} />
+    : shownId ? <Business key={shownId} id={shownId} businesses={me.businesses} go={go} onChange={loadMe} onDeleted={async () => { await loadMe(); go('/app'); }} />
     : <Onboard onCreated={async (id) => { await loadMe(); go('/app/b/' + id); }} />;
   // One thin bar instead of a side nav: with up to 3 businesses a sidebar is mostly empty space.
   const current = me.businesses.find((b) => b.id === shownId);
