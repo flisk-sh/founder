@@ -1,0 +1,26 @@
+# founder.flisk.si: the private cabinet. Deploy by hand: bunx wrangler@4 deploy (the user's call).
+# Secrets: SESSION_SECRET, INFERENCE_KEY (inference.flisk.si fallback). Model: Workers AI first.
+# Secret: SESSION_SECRET (wrangler secret put SESSION_SECRET). Rotating it signs everyone out, nothing else.
+name = "flisk-founder"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+routes = [{ pattern = "founder.flisk.si", custom_domain = true }]
+
+[vars]
+LOGIN_PUBLIC_KEY = "g_3cGlqaMDf4mM4Bgfv8EO6js7yW_bcSW7cOUpSwLc0"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "founder"
+database_id = "cf12568d-9ba8-4b12-9690-ad66b7ba8545"
+
+[ai]
+binding = "AI"
+
+[[services]]
+binding = "INFERENCE"
+service = "flisk-inference"
+
+# Owners' public web pages at <name>.app.flisk.si are served by this Worker (src/site.js).
+# To turn them on in production: add a wildcard DNS record *.app.flisk.si (proxied), then add this to the routes list above
+# and deploy (the user's call):  { pattern = "*.app.flisk.si/*", zone_name = "flisk.si" }

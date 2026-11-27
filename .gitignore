@@ -1,0 +1,9 @@
+node_modules
+web/node_modules
+web/dist
+dist-worker
+.dev.vars
+.wrangler
+.claude
+.dev.sqlite
+dogfood-output/
