@@ -49,5 +49,6 @@ export async function siteStats(env, bid, now) {
   const v = await env.DB.prepare('SELECT SUM(n) AS week FROM visits WHERE business_id = ? AND day >= ?').bind(bid, since).first();
   const all = await env.DB.prepare('SELECT SUM(n) AS total FROM visits WHERE business_id = ?').bind(bid).first();
   const signups = (await env.DB.prepare('SELECT email, at FROM signups WHERE business_id = ? ORDER BY at DESC LIMIT 200').bind(bid).all()).results;
-  return { published: s?.published || null, visits_week: v?.week || 0, visits_total: all?.total || 0, signups };
+  const days = (await env.DB.prepare('SELECT day, n FROM visits WHERE business_id = ? AND day >= ? ORDER BY day').bind(bid, day(now - 83 * 864e5)).all()).results;
+  return { published: s?.published || null, visits_week: v?.week || 0, visits_total: all?.total || 0, signups, days };
 }

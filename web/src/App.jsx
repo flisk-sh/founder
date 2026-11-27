@@ -227,6 +227,39 @@ function Website({d, big}) {
   );
 }
 
+// Bottom panel: collapsed to a thin bar; drag it up (or click) to see visits as a heatmap, 12 weeks by weekday.
+function VisitsPanel({d}) {
+  const [h, setH] = useState(34), drag = useRef(null);
+  const site = d.site || {days: []}, by = Object.fromEntries((site.days || []).map((x) => [x.day, x.n]));
+  const max = Math.max(1, ...Object.values(by)), today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const wd = (today.getUTCDay() + 6) % 7, start = today.getTime() - (11 * 7 + wd) * 864e5, weeks = [];
+  for (let w = 0; w < 12; w++) weeks.push(Array.from({length: 7}, (_, k) => { const t = start + (w * 7 + k) * 864e5, key = new Date(t).toISOString().slice(0, 10); return {key, n: by[key] || 0, future: t > today.getTime()}; }));
+  const best = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
+  const down = (e) => { drag.current = {y: e.clientY, h, moved: false}; e.currentTarget.setPointerCapture(e.pointerId); };
+  const move = (e) => { const g = drag.current; if (!g) return; const dy = g.y - e.clientY; if (Math.abs(dy) > 3) g.moved = true; setH(Math.min(Math.round(innerHeight * 0.6), Math.max(34, g.h + dy))); };
+  const up = () => { const g = drag.current; drag.current = null; if (g && !g.moved) setH((x) => (x > 40 ? 34 : 260)); };
+  return (
+    <section className="visits-panel" style={{height: h}} aria-label="Visitors">
+      <div className="vp-bar" role="button" tabIndex={0} aria-expanded={h > 40} onPointerDown={down} onPointerMove={move} onPointerUp={up}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setH((x) => (x > 40 ? 34 : 260)))}>
+        <span className="vp-grip" /> <b>Visitors</b> <span>{site.visits_week || 0} this week · {site.visits_total || 0} in total · {(site.signups || []).length} left their email</span>
+        <em>{h > 40 ? 'drag down or click to close' : 'drag up or click to see the map'}</em>
+      </div>
+      {h > 40 && <div className="vp-body">
+        <div className="heat" role="img" aria-label="Visits per day over the last 12 weeks">
+          <div className="heat-days">{['Mon', '', 'Wed', '', 'Fri', '', 'Sun'].map((x, i) => <span key={i}>{x}</span>)}</div>
+          {weeks.map((col, i) => <div key={i} className="heat-col">{col.map((c) => <Tooltip key={c.key} content={`${c.key}: ${c.n} visit${c.n === 1 ? '' : 's'}`}><span className={'cell' + (c.future ? ' future' : '')} style={{'--v': c.n ? 0.2 + 0.8 * c.n / max : 0}} /></Tooltip>)}</div>)}
+        </div>
+        <dl className="nums">
+          <dt>Busiest day</dt><dd>{best ? `${best[0]} (${best[1]})` : 'no visits yet'}</dd>
+          <dt>Web page</dt><dd>{site.published ? 'online' : 'not online yet'}</dd>
+          <dt>Counted how</dt><dd><em>page opens per day, no cookies, no personal data</em></dd>
+        </dl>
+      </div>}
+    </section>
+  );
+}
+
 function Activity({d}) {
   return (
     <div className="acts">{d.audit.map((a, i) => <div key={i} className="act"><StatusDot variant={a.action === 'failed' || a.action === 'stopped' ? 'error' : a.action === 'done' || a.action === 'approved' ? 'success' : 'neutral'} label={a.action} />
@@ -466,6 +499,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
         </section>
         <aside className="board-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></aside>
       </div>
+      <VisitsPanel d={d} />
       <Drawer isOpen={!!doc} onOpenChange={(o) => !o && setDoc(null)} label={doc?.title || 'Document'} side="end" width={640}>
         <DrawerHeader title={doc?.title || ''} onOpenChange={(o) => !o && setDoc(null)} hasDivider
           endContent={<Button label="Copy" size="sm" variant="ghost" icon={ic(ClipboardIcon)} onClick={() => { navigator.clipboard?.writeText(doc?.body || ''); say('Copied'); }} />} />

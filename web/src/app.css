@@ -342,3 +342,12 @@ html,body{color-scheme:light;background:#f6efe7}
 /* Four columns like Polsia down to 1280: narrower chat, job buttons under the title */
 @media (max-width:1500px) and (min-width:1280px){.board{grid-template-columns:minmax(0,.95fr) minmax(0,1.2fr) minmax(0,.95fr) 300px}
   .board .task-line{display:flex;flex-wrap:wrap;gap:6px 8px}.board .task-line .task-title{flex:1 1 60%;min-width:0}.board .task-line>:last-child{margin-left:auto}}
+/* Bottom visitors panel with heatmap */
+.visits-panel{flex:none;border-top:1px solid var(--color-border-emphasized,#8886);background:var(--color-background-card,#fff);display:flex;flex-direction:column;overflow:hidden;transition:height .15s}
+.vp-bar{height:34px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;cursor:ns-resize;user-select:none;touch-action:none;font-size:14px}
+.vp-bar em{margin-left:auto;font-style:normal;opacity:.55;font-size:13px}.vp-bar:focus-visible{outline:2px solid var(--color-accent,#b45309);outline-offset:-2px}
+.vp-grip{width:36px;height:4px;border-radius:2px;background:var(--color-border-emphasized,#8886)}
+.vp-body{flex:1;min-height:0;display:flex;gap:32px;padding:8px 16px 14px;align-items:flex-start;overflow:auto}
+.heat{display:flex;gap:4px}.heat-days,.heat-col{display:grid;grid-template-rows:repeat(7,18px);gap:4px}.heat-days span{font-size:11px;opacity:.6;line-height:18px;padding-right:4px}
+.cell{display:block;width:18px;height:18px;border-radius:4px;background:color-mix(in srgb,var(--color-accent,#b45309) calc((0.12 + var(--v)*0.88)*100%),var(--color-background-muted,#eee));outline:1px solid #0001}
+.cell.future{opacity:.25}

@@ -132,6 +132,7 @@ describe('web page online', () => {
     const d = await (await req(e, a, `/api/businesses/${id}`)).json();
     expect(d.site.signups.map((s) => s.email)).toEqual(['ann@example.com']);
     expect(d.site.visits_week).toBeGreaterThan(0);
+    expect(d.site.days[0].n).toBeGreaterThan(0);
   });
   test('owner can take it offline, and delete removes everything', async () => {
     const { e, a, id, w } = await online();
