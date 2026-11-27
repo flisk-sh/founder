@@ -415,7 +415,8 @@ function Business({id, onChange, onDeleted, businesses, go}) {
             <Text type="supporting" color="secondary">{done === 0 ? 'After the first jobs, you get one clear answer: keep going, change course, grow, or stop.' : 'No sales yet, so the advice is to keep going. You will see "grow" once customers come.'}</Text></div>
           <div className="sec-h"><h3>Your addresses</h3><span className="sub">included, ready when you go online</span></div>
           <dl className="nums addr">
-            <dt>Web page</dt><dd>{b.name}.flisk.si</dd>
+            <dt>Web page</dt><dd>{b.name}.app.flisk.si</dd>
+            <dt>Short link</dt><dd>{b.name}.flisk.si</dd>
             <dt>Email</dt><dd>{b.name}@app.flisk.si</dd>
           </dl>
           <div className="sec-h"><h3>Your safety</h3></div>
