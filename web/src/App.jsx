@@ -1,7 +1,4 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {AppShell} from '@astryxdesign/core/AppShell';
-import {MobileNav, MobileNavToggle} from '@astryxdesign/core/MobileNav';
-import {SideNav, SideNavItem, SideNavSection, SideNavRenderContext} from '@astryxdesign/core/SideNav';
 import {HStack, VStack} from '@astryxdesign/core/Layout';
 import {Card} from '@astryxdesign/core/Card';
 import {Badge} from '@astryxdesign/core/Badge';
@@ -321,24 +318,6 @@ function Business({id, onChange, onDeleted}) {
 }
 
 // ---------- shell ----------
-function Nav({me, current, go}) {
-  return (
-    <SideNav collapsible
-      header={<HStack gap={2} align="center"><span className="brand"><Icon icon={ShieldCheckIcon} size="sm" /></span><VStack gap={0}><Text type="emphasized">Founder</Text><Text type="supporting" color="secondary">by Flisk</Text></VStack></HStack>}
-      topContent={<Button label="New business" variant="primary" icon={ic(PlusIcon)} isFullWidth onClick={() => go('/app/new')} />}
-      footer={<HStack gap={2} align="center"><Avatar name={me.user.login} size="small" /><VStack gap={0}><span data-flisk-login="">{me.user.login}</span><a className="muted-link" href="/auth/out">Sign out</a></VStack></HStack>}>
-      <SideNavSection title="Businesses">
-        {me.businesses.map((b) => <SideNavItem key={b.id} label={b.name} icon={BuildingStorefrontIcon} isSelected={current === b.id} onClick={() => go('/app/b/' + b.id)}
-          endContent={<StatusDot variant={(STATUS[b.status] || STATUS.paused)[0]} label={(STATUS[b.status] || STATUS.paused)[1]} />} />)}
-        {!me.businesses.length && <Text type="supporting" color="secondary">None yet.</Text>}
-      </SideNavSection>
-      <SideNavSection title="Trust">
-        <SideNavItem label="How Founder stays safe" icon={LockClosedIcon} onClick={() => go('/app/safety')} isSelected={current === 'safety'} />
-      </SideNavSection>
-    </SideNav>
-  );
-}
-
 function Safety() {
   const rules = [
     [ShieldCheckIcon, 'Approval for everything', 'Founder drafts and proposes. You approve each task, email, ad and deploy. An approval covers one exact item and its cost, once; if the item changes, it needs a new approval.'],
@@ -353,10 +332,10 @@ function Safety() {
 }
 
 export default function App() {
-  const [me, setMe] = useState(undefined), [p, setP] = useState(path()), [navOpen, setNavOpen] = useState(false);
+  const [me, setMe] = useState(undefined), [p, setP] = useState(path());
   const loadMe = useCallback(() => fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then(setMe).catch(() => setMe(null)), []);
   useEffect(() => { loadMe(); const f = () => setP(path()); addEventListener('popstate', f); return () => removeEventListener('popstate', f); }, [loadMe]);
-  const go = (to) => { history.pushState(null, '', to); setP(to); setNavOpen(false); };
+  const go = (to) => { history.pushState(null, '', to); setP(to); };
   if (me === undefined) return <div className="page"><Text color="secondary">Loading…</Text></div>;
   if (!me) return <Landing />;
   const bid = (p.match(/^\/app\/b\/([\w-]+)$/) || [])[1];
@@ -365,12 +344,25 @@ export default function App() {
   const view = p === '/app/safety' ? <Safety />
     : shownId ? <Business key={shownId} id={shownId} onChange={loadMe} onDeleted={async () => { await loadMe(); go('/app'); }} />
     : <Onboard onCreated={async (id) => { await loadMe(); go('/app/b/' + id); }} />;
-  const nav = <Nav me={me} current={p === '/app/safety' ? 'safety' : shownId} go={go} />;
+  // One thin bar instead of a side nav: with up to 3 businesses a sidebar is mostly empty space.
+  const current = me.businesses.find((b) => b.id === shownId);
   return (
-    <AppShell height="fill" mobileNav={{hasToggle: false, isOpen: navOpen, onOpenChange: setNavOpen, content: <MobileNav header="Founder"><SideNavRenderContext value="drawer-content">{nav}</SideNavRenderContext></MobileNav>}}
-      topNav={<HStack gap={2} align="center" style={{padding: 'var(--spacing-2) var(--spacing-3)'}}><MobileNavToggle /><Icon icon={LockClosedIcon} size="sm" /><Text type="supporting" color="secondary">Private cabinet · only you can see this</Text></HStack>}
-      sideNav={nav}>
-      <div style={{height: '100%', overflow: 'auto'}}>{view}</div>
-    </AppShell>
+    <div className="app">
+      <header className="topbar">
+        <span className="brand"><Icon icon={ShieldCheckIcon} size="sm" /></span>
+        <b className="topbar-name">Founder</b>
+        {me.businesses.length > 0 && <label className="switch" title="Switch business">
+          {current && <StatusDot variant={(STATUS[current.status] || STATUS.paused)[0]} label={(STATUS[current.status] || STATUS.paused)[1]} />}
+          <select aria-label="Business" value={shownId || ''} onChange={(e) => go('/app/b/' + e.target.value)}>
+            {!shownId && <option value="">Choose a business</option>}
+            {me.businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select></label>}
+        {me.businesses.length < 3 && <Button label="New" size="sm" variant={p === '/app/new' ? 'primary' : 'ghost'} icon={ic(PlusIcon)} onClick={() => go('/app/new')} />}
+        <span style={{flex: 1}} />
+        <button className="topbar-link" onClick={() => go('/app/safety')}><Icon icon={LockClosedIcon} size="sm" /><span>Private · how it stays safe</span></button>
+        <span className="topbar-user"><Avatar name={me.user.login} size="small" /><span data-flisk-login="">{me.user.login}</span><a href="/auth/out">Sign out</a></span>
+      </header>
+      <main className="app-main">{view}</main>
+    </div>
   );
 }
