@@ -12,7 +12,7 @@ LOGIN_PUBLIC_KEY = "g_3cGlqaMDf4mM4Bgfv8EO6js7yW_bcSW7cOUpSwLc0"
 [[d1_databases]]
 binding = "DB"
 database_name = "founder"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "cf12568d-9ba8-4b12-9690-ad66b7ba8545"
 
 [ai]
 binding = "AI"
