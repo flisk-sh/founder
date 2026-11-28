@@ -355,3 +355,4 @@ html,body{color-scheme:light;background:#f6efe7}
 @media (max-width:480px){.board .task-line{display:flex;flex-wrap:wrap;gap:6px 8px}.board .task-line .task-title{flex:1 1 55%;min-width:0}.board .task-line .cost{white-space:nowrap;align-self:center}.board .task-line>.task-act,.board .task-line>:last-child{flex-basis:100%;display:flex;justify-content:flex-end}
   .work-head [aria-label="More"],.work-head button[aria-haspopup]{min-width:44px;min-height:44px}}
 @media (max-width:480px){.work-head>:last-child,.work-head>:last-child button{min-width:44px;min-height:44px;opacity:1}}
+.chat-frame{flex:1;width:100%;height:100%;border:0;background:transparent;color-scheme:normal}
