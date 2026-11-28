@@ -355,8 +355,8 @@ function Business({id, onChange, onDeleted, businesses, go}) {
     try { const j = await call(url, method, body); say(j.note ? ok + '. ' + j.note : j.status === 'failed' ? 'It did not work. Open the job to see why.' : ok); await load(); onChange(); return true; }
     catch (x) { say(x.message); return false; } finally { setBusy(false); }
   };
-  const askNow = (t) => { navigator.clipboard?.writeText(t); say('Copied “' + t + '”. Paste it in the chat on the right.'); };
-  const ask = (t) => { if (t) { navigator.clipboard?.writeText(t); say('Copied. Paste it in the chat on the right.'); } };
+  const askNow = (t) => { navigator.clipboard?.writeText(t).catch(() => {}); say('Copied “' + t + '”. Paste it in the chat on the right.'); };
+  const ask = (t) => { if (t) { navigator.clipboard?.writeText(t).catch(() => {}); say('Copied. Paste it in the chat on the right.'); } };
   useHotkeys([
     {keys: 'mod+k', allowInInputs: true, onPress: () => setPalette((x) => !x)},
     {keys: '/', onPress: () => inputRef.current?.focus?.()},
