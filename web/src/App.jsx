@@ -42,8 +42,10 @@ const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 
 const path = () => location.pathname.replace(/\/+$/, '');
 const STATUS = {active: ['success', 'Working'], paused: ['neutral', 'Not started'], stopped: ['error', 'Stopped']};
 // What each logged action means, in plain words.
-const siteUrl = (name) => (/\.flisk\.si$/.test(location.hostname) ? 'https://' + name + '.app.flisk.si' : '/s/' + name);
-const DID = {unpublished: 'Taken offline', signup_removed: 'Email removed', created: 'Plan made', approved: 'You said yes', rejected: 'You said no', started: 'Started', stopped: 'Stopped', done: 'Done', failed: 'Did not work', running: 'Working on it', caps: 'Limits changed', settings: 'Details changed', proposed: 'New job suggested', deleted: 'Deleted'};
+// *.app.flisk.si has no DNS record yet, so the live page is served at <this host>/s/<name> (see wrangler.toml).
+const siteUrl = (name) => location.origin + '/s/' + name;
+const siteLabel = (name) => siteUrl(name).replace(/^https?:\/\//, '');
+const DID = {retry: 'Back in your list', unpublished: 'Taken offline', signup_removed: 'Email removed', created: 'Plan made', approved: 'You said yes', rejected: 'You said no', started: 'Started', stopped: 'Stopped', done: 'Done', failed: 'Did not work', running: 'Working on it', caps: 'Limits changed', settings: 'Details changed', proposed: 'New job suggested', deleted: 'Deleted'};
 
 const KIND_ICON = {engineering: BoltIcon, research: LightBulbIcon, growth: ChartBarIcon, ops: ClipboardDocumentListIcon};
 
@@ -100,7 +102,7 @@ function Onboard({onCreated}) {
         <TextArea label="Your business" isLabelHidden value={idea} onChange={setIdea} rows={3} placeholder="For example: a family pizzeria near the train station" />
         <HStack gap={2} wrap="wrap">{EXAMPLES.map((x) => <Button key={x} label={x} size="sm" variant="secondary" onClick={() => setIdea(x)} />)}</HStack>
         <Collapsible trigger={<Text type="supporting" color="secondary">Choose a short name yourself (you can skip this)</Text>}>
-          <div style={{maxWidth: 320, paddingTop: 8}}><TextInput label="Name" value={name} onChange={setName} placeholder="marios-pizza" description="Used for your web address, like marios-pizza.app.flisk.si" /></div>
+          <div style={{maxWidth: 320, paddingTop: 8}}><TextInput label="Name" value={name} onChange={setName} placeholder="marios-pizza" description="Used for your web address, like founder.flisk.si/s/marios-pizza" /></div>
         </Collapsible>
         <HStack gap={3} align="center" wrap="wrap"><Button label="Make my plan" variant="primary" size="lg" type="submit" isDisabled={idea.trim().length < 8} icon={ic(SparklesIcon)} />
           <Text type="supporting" color="secondary">Free · nothing goes online · nothing is paid</Text></HStack>
@@ -116,9 +118,11 @@ function TaskRow({w, act, ask}) {
   const yes = () => act('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}, 'You said yes to “' + w.title + '”');
   const no = () => act('/api/work/' + w.id + '/reject', 'POST', {}, 'You said no to “' + w.title + '”');
   const now = () => act('/api/work/' + w.id + '/run', 'POST', {}, 'Done: ' + w.title);
+  const again = () => act('/api/work/' + w.id + '/retry', 'POST', {}, '“' + w.title + '” is back in your list. Say yes to try again.');
   const items = [
     ...(w.status === 'proposed' ? [{label: 'Yes, do this', icon: CheckIcon, onClick: yes}, {label: 'No, skip it', icon: XMarkIcon, onClick: no}, {type: 'divider'}] : []),
     ...(w.status === 'approved' ? [{label: 'Do it now', icon: PlayIcon, onClick: now}, {type: 'divider'}] : []),
+    ...(w.status === 'failed' ? [{label: 'Try again', icon: PlayIcon, onClick: again}, {type: 'divider'}] : []),
     {label: 'Ask the assistant about it', icon: ChatBubbleOvalLeftIcon, onClick: () => ask('About the job “' + w.title + '”: ')},
     {label: open ? 'Hide details' : 'Show details', icon: InformationCircleIcon, onClick: () => setOpen(!open)},
     {label: 'Copy', icon: ClipboardIcon, onClick: () => navigator.clipboard?.writeText(w.title + (w.result ? '\n\n' + w.result : ''))},
@@ -142,7 +146,8 @@ function TaskRow({w, act, ask}) {
             <Button label="Yes" icon={ic(CheckIcon)} size="sm" variant="primary" onClick={yes} />
             <Button label="No" size="sm" variant="secondary" onClick={no} /></span>}
           {w.status === 'approved' && <Button label="Do it now" size="sm" variant="secondary" icon={ic(PlayIcon)} onClick={now} />}
-          {st && w.status !== 'approved' && <Badge label={st[0]} variant={st[1]} />}
+          {w.status === 'failed' ? <span className="task-act"><Badge label={st[0]} variant={st[1]} /><Button label="Try again" size="sm" variant="secondary" onClick={again} /></span>
+            : st && w.status !== 'approved' && <Badge label={st[0]} variant={st[1]} />}
         </div>
         {open && <div className="task-more">
           {w.body && <Text type="supporting" color="secondary">{w.body}</Text>}
@@ -210,7 +215,7 @@ function Website({d, big}) {
   useEffect(() => { fetch('/app/b/' + b.id + '/preview').then((r) => (r.ok ? r.text() : '')).then(setHtml).catch(() => setHtml('')); }, [b.id, d.draft?.headline]);
   if (!d.draft) return <div className="browser empty"><Text color="secondary">No web page yet.</Text></div>;
   return (
-    <div className={'browser' + (big ? ' big' : '')}><div className="browser-bar"><span /><span /><span /><em>{b.name}.app.flisk.si</em><b>{d.site?.published ? 'Online' : 'Draft · not online yet'}</b></div>
+    <div className={'browser' + (big ? ' big' : '')}><div className="browser-bar"><span /><span /><span /><em>{siteLabel(b.name)}</em><b>{d.site?.published ? 'Online' : 'Draft · not online yet'}</b></div>
       <iframe title={'Web page draft for ' + b.name} srcDoc={html} sandbox="" referrerPolicy="no-referrer" /></div>
   );
 }
@@ -341,17 +346,20 @@ function Business({id, onChange, onDeleted, businesses, go}) {
     {keys: '/', onPress: () => inputRef.current?.focus?.()},
   ]);
   if (!d) return <div className="page"><Text color="secondary">Loading…</Text></div>;
-  const b = d.business, [dot, label] = STATUS[b.status] || STATUS.paused;
-  const waiting = d.work.filter((w) => w.status === 'proposed'), done = d.work.filter((w) => w.status === 'done').length;
+  const b = d.business, working = b.status === 'active' && d.work.some((w) => w.status === 'approved' || w.status === 'running');
+  // Started but nothing queued: it is on and waiting for the next yes, not working.
+  const [dot, label] = b.status === 'active' && !working ? ['neutral', 'Ready'] : STATUS[b.status] || STATUS.paused;
+  const waiting = d.work.filter((w) => w.status === 'proposed'), done = d.work.filter((w) => w.status === 'done').length, failed = d.work.filter((w) => w.status === 'failed').length;
   const spent = Math.max(0, Object.values(d.spent).reduce((x, c) => x + c, 0)), limit = Object.values(d.caps).reduce((x, c) => x + c, 0);
   const yesAll = () => yesAllOf(waiting);
-  const copyAddr = () => { navigator.clipboard?.writeText('https://' + b.name + '.app.flisk.si'); say('Address copied'); };
+  const copyAddr = () => { navigator.clipboard?.writeText(siteUrl(b.name)); say('Address copied'); };
   const download = () => { location.href = '/api/businesses/' + b.id + '/export'; };
   // The next useful thing to do, instead of a row of zeros.
   const next = b.status === 'stopped' ? 'Everything is stopped. Press Start when you want to go on.'
     : !b.north_star ? 'Next: tell us how you measure success (⋯ → Details).'
     : waiting.length && b.status !== 'active' ? `Next: say yes to the jobs you like, then press Start.`
     : waiting.length ? `${nJobs(waiting.length)} ${waiting.length === 1 ? 'waits' : 'wait'} for your answer.`
+    : failed ? `${nJobs(failed)} did not work. Press Try again, or open ${failed === 1 ? 'it' : 'them'} below to see why.`
     : b.status !== 'active' ? 'Next: press Start.' : 'All set. Ask your assistant for the next idea.';
   const menu = [
     {label: 'Your web page', description: 'Draft, not online yet', icon: GlobeAltIcon, items: [
@@ -406,9 +414,9 @@ function Business({id, onChange, onDeleted, businesses, go}) {
         <section className="col">
           <div className="sec-h"><h3>Your assistant</h3></div>
           <div className="agent">
-            <pre className="face">{b.status === 'active' ? '( ^ ‿ ^ )' : b.status === 'stopped' ? '( - _ - )' : '( o ‿ o )'}</pre>
-            <div><b>{b.status === 'active' ? 'Working' : b.status === 'stopped' ? 'Stopped' : 'Waiting for you'}</b>
-              <Text type="supporting" color="secondary">{b.status === 'active' ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : `${done} of ${nJobs(d.work.length)} done so far.`}</Text></div>
+            <pre className="face">{working ? '( ^ ‿ ^ )' : b.status === 'stopped' ? '( - _ - )' : '( o ‿ o )'}</pre>
+            <div><b>{working ? 'Working' : b.status === 'active' ? 'Ready' : b.status === 'stopped' ? 'Stopped' : 'Waiting for you'}</b>
+              <Text type="supporting" color="secondary">{working ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : b.status === 'active' ? 'New jobs you say yes to start right away.' : `${done} of ${nJobs(d.work.length)} done so far.`}</Text></div>
           </div>
           <div className="sec-h"><h3>Business</h3><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
           <dl className="nums">
@@ -425,7 +433,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
             <Text type="supporting" color="secondary">{done === 0 ? 'After the first jobs, you get one clear answer: keep going, change course, grow, or stop.' : 'No sales yet, so the advice is to keep going. You will see "grow" once customers come.'}</Text></div>
           <div className="sec-h"><h3>Your addresses</h3><span className="sub">kept for you</span></div>
           <dl className="nums addr">
-            <dt>Web page</dt><dd>{d.site?.published ? <a href={siteUrl(b.name)} target="_blank" rel="noopener">{b.name}.app.flisk.si</a> : b.name + '.app.flisk.si'} <em>{d.site?.published ? 'online' : 'not online yet'}</em></dd>
+            <dt>Web page</dt><dd>{d.site?.published ? <a href={siteUrl(b.name)} target="_blank" rel="noopener">{siteLabel(b.name)}</a> : siteLabel(b.name)} <em>{d.site?.published ? 'online' : 'not online yet'}</em></dd>
             <dt>Short link</dt><dd>{b.name}.flisk.si <em>coming soon</em></dd>
             <dt>Email</dt><dd>{b.name}@app.flisk.si <em>coming soon</em></dd>
           </dl>

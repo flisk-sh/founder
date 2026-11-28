@@ -50,6 +50,14 @@ export async function stop(env, me, b, now) {
   return { status: 'stopped', ran: 0 };
 }
 
+// A job that did not work goes back to "waiting for your answer", so the owner can say yes to it again.
+export async function retry(env, me, w, now) {
+  const back = await env.DB.prepare("UPDATE work_items SET status = 'proposed', result = '', verified = '', decided = NULL, finished = NULL WHERE id = ? AND status = 'failed'").bind(w.id).run();
+  if (!(back.changes ?? back.meta?.changes)) return refuse(409, 'not_failed');
+  await audit(env, w.business_id, me.id, 'retry', w.title, now);
+  return { status: 'proposed' };
+}
+
 export async function reject(env, me, w, now) {
   if (w.status !== 'proposed') return refuse(409, 'already_decided');
   await env.DB.prepare("UPDATE work_items SET status = 'rejected', decided = ? WHERE id = ?").bind(now, w.id).run();

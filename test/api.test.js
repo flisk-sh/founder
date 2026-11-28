@@ -177,3 +177,24 @@ describe('start runs the approved jobs', () => {
     expect(d0).toBeTruthy();
   });
 });
+
+describe('a job that did not work can be tried again', () => {
+  test('retry puts a failed job back to waiting, only for its owner', async () => {
+    const e = env(), a = await signIn(e, 'alice'), b = await signIn(e, 'bob');
+    const ob = await (await req(e, a, '/api/onboard', 'POST', { idea: 'A small bakery that delivers bread', name: 'bakery' })).json();
+    const id = ob.id || ob.business?.id;
+    await req(e, a, `/api/businesses/${id}/start`, 'POST', {});
+    const d = await (await req(e, a, `/api/businesses/${id}`)).json();
+    // No model in tests, so a writing job fails.
+    const w = d.work.find((x) => x.status === 'proposed' && !/web page online/i.test(x.title));
+    expect((await (await req(e, a, `/api/work/${w.id}/approve`, 'POST', { hash: w.hash })).json()).status).toBe('failed');
+    expect((await req(e, b, `/api/work/${w.id}/retry`, 'POST', {})).status).toBe(404);
+    expect((await (await req(e, a, `/api/work/${w.id}/retry`, 'POST', {})).json()).status).toBe('proposed');
+    expect((await req(e, a, `/api/work/${w.id}/retry`, 'POST', {})).status).toBe(409);
+    const back = (await (await req(e, a, `/api/businesses/${id}`)).json()).work.find((x) => x.id === w.id);
+    expect(back.status).toBe('proposed');
+    expect(back.result).toBeFalsy();
+    // The same approval works again.
+    expect((await (await req(e, a, `/api/work/${w.id}/approve`, 'POST', { hash: back.hash })).json()).status).toBe('failed');
+  });
+});
