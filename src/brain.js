@@ -4,6 +4,15 @@ import { ask, firstJson } from './model.js';
 import { KINDS, SPEND } from './policy.js';
 
 const s = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+// Chat replies keep their line breaks (lists) and never print "[object Object]" when the model answers with nested JSON.
+export function toText(v, depth = 0) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v !== 'object' || depth > 3) return String(v);
+  if (Array.isArray(v)) return v.map((x) => (typeof x === 'object' && x ? toText(x, depth + 1) : '- ' + toText(x, depth + 1))).join('\n');
+  return Object.entries(v).map(([k, x]) => (typeof x === 'object' && x ? `${k}:\n${toText(x, depth + 1)}` : `${k}: ${toText(x, depth + 1)}`)).join('\n');
+}
+const reply = (v, max) => toText(v).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
 const words = (t) => s(t, 400).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter((w) => w.length > 2);
 const STOP = new Set(['the', 'and', 'for', 'with', 'that', 'app', 'tool', 'who', 'your', 'from', 'want', 'make', 'build', 'help', 'helps', 'into', 'their', 'small', 'simple', 'online']);
 
@@ -82,8 +91,8 @@ export async function chat(env, b, tasks, history, text) {
   const msgs = [{ role: 'system', content: CHAT_SYSTEM(b, tasks) }, ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: s(text, 1000) }];
   const ans = await ask(env, msgs, { maxTokens: 500 });
   const j = ans ? firstJson(ans.text) : null;
-  if (j?.reply) return { reply: s(j.reply, 1200), propose: j.propose ? cleanTask(j.propose) : null, offline: false };
-  if (ans?.text) return { reply: s(ans.text, 1200), propose: null, offline: false };
+  if (j?.reply) return { reply: reply(j.reply, 1200), propose: j.propose ? cleanTask(j.propose) : null, offline: false };
+  if (ans?.text) return { reply: reply(ans.text, 1200), propose: null, offline: false };
   // Offline: the one useful thing without a model is turning the request into a proposed task.
   const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up|plan|check|list|suggest|prepare)\b/i.test(s(text, 200));
   return {

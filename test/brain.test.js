@@ -125,3 +125,11 @@ test('idea splits into a brand and a short headline', () => {
   expect(splitIdea("Rosa's taquería & café — tacos al pastor near the market", 'rosas')).toEqual({ brand: "Rosa's taquería & café", headline: 'Tacos al pastor near the market' });
   expect(splitIdea('A bakery that delivers fresh bread', 'bakery-2').brand).toBe('Bakery');
 });
+
+import { toText } from '../src/brain.js';
+test('toText turns nested model replies into readable text, never [object Object]', () => {
+  const out = toText({ 'Kitchen staff': ['Prepare food', 'Clean'], Other: { a: 'b' } });
+  expect(out).not.toContain('[object Object]');
+  expect(out).toContain('Kitchen staff:\n- Prepare food\n- Clean');
+  expect(toText(['x', { y: 1 }])).toBe('- x\ny: 1');
+});
