@@ -1,18 +1,11 @@
 // The founder brain: turns an idea into a company draft, answers chat about the business, and does approved tasks.
 // Everything it makes is a proposal or a draft. Model output is data: clamped, typed, and never run or served as HTML.
 import { ask, firstJson } from './model.js';
-import { KINDS, SPEND } from './policy.js';
+import { SPEND } from './policy.js';
+import { cleanTask, interpretChat, s } from './reply.js';
 
-const s = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
-// Chat replies keep their line breaks (lists) and never print "[object Object]" when the model answers with nested JSON.
-export function toText(v, depth = 0) {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v !== 'object' || depth > 3) return String(v);
-  if (Array.isArray(v)) return v.map((x) => (typeof x === 'object' && x ? toText(x, depth + 1) : '- ' + toText(x, depth + 1))).join('\n');
-  return Object.entries(v).map(([k, x]) => (typeof x === 'object' && x ? `${k}:\n${toText(x, depth + 1)}` : `${k}: ${toText(x, depth + 1)}`)).join('\n');
-}
-const reply = (v, max) => toText(v).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
+export { parsePlainChat, toText } from './reply.js';
+
 const words = (t) => s(t, 400).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter((w) => w.length > 2);
 const STOP = new Set(['the', 'and', 'for', 'with', 'that', 'app', 'tool', 'who', 'your', 'from', 'want', 'make', 'build', 'help', 'helps', 'into', 'their', 'small', 'simple', 'online']);
 
@@ -23,15 +16,6 @@ export function suggestName(idea) {
   return /^[a-z]/.test(n) && n.length >= 3 ? n : 'biz-' + n.slice(0, 26);
 }
 
-function cleanTask(t) {
-  const title = s(t?.title, 120);
-  if (!title) return null;
-  const kind = KINDS.includes(t?.kind) ? t.kind : 'research';
-  // A first-week task from the brain never spends on ads or mail: those need the owner to set a cap and ask.
-  const spend_kind = ['llm', 'infra'].includes(t?.spend_kind) ? t.spend_kind : 'llm';
-  const cost = Math.min(5, Math.max(0, Math.round(Number(t?.cost_usd) * 100) / 100 || 0.5));
-  return { kind, title, body: s(t?.body, 600), spend_kind, cost_usd: cost };
-}
 function cleanLanding(l, fallbackName) {
   const bullets = (Array.isArray(l?.bullets) ? l.bullets : []).map((b) => s(b, 120)).filter(Boolean).slice(0, 3);
   return { headline: s(l?.headline, 90) || fallbackName, sub: s(l?.sub, 200), bullets, cta: s(l?.cta, 30) || 'Join the waitlist' };
@@ -87,33 +71,11 @@ Open tasks: ${tasks.map((t) => `[${t.status}] ${t.title}`).join('; ') || 'none'}
 You cannot spend, send, post or deploy anything: you can only PROPOSE a task, which the founder approves. The owner is not technical (think a restaurant or shop owner): use plain everyday words, no tech or marketing jargon, short sentences. Be concrete and honest; say when you do not know.
 Answer ONLY with JSON: {"reply": "your answer, under 120 words", "propose": null or {"kind": "engineering|research|growth|ops", "title": "...", "body": "...", "spend_kind": "llm|infra", "cost_usd": 0.1-3}}`;
 
-// Some models ignore "answer with JSON" and write `reply: ... propose: kind: x title: y body: z ...` as plain text.
-// Show only the reply and turn the propose part into a task, instead of printing the whole thing to the owner.
-const PROPOSE = /\spropose:\s*(?=kind:|null\b|none\b)/i;
-const FIELD = /\b(kind|title|body|spend_kind|cost_usd):/gi;
-export function parsePlainChat(text) {
-  const raw = String(text).trim();
-  if (!/^reply:/i.test(raw)) return null;
-  const rest = raw.slice(6);
-  const cut = PROPOSE.exec(rest); // only "propose:" followed by a field or null splits; ordinary prose may use the word
-  const replyText = (cut ? rest.slice(0, cut.index) : rest).trim();
-  if (!replyText) return null;
-  if (!cut) return { reply: replyText, propose: null };
-  const tail = rest.slice(cut.index + cut[0].length);
-  const marks = [...tail.matchAll(FIELD)];
-  const fields = {};
-  marks.forEach((m, i) => { fields[m[1].toLowerCase()] = tail.slice(m.index + m[0].length, marks[i + 1]?.index ?? tail.length).trim(); });
-  return { reply: replyText, propose: marks.length ? cleanTask(fields) : null };
-}
-
 export async function chat(env, b, tasks, history, text) {
   const msgs = [{ role: 'system', content: CHAT_SYSTEM(b, tasks) }, ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: s(text, 1000) }];
   const ans = await ask(env, msgs, { maxTokens: 500 });
-  const j = ans ? firstJson(ans.text) : null;
-  if (j?.reply) return { reply: reply(j.reply, 1200), propose: j.propose ? cleanTask(j.propose) : null, offline: false };
-  const plain = ans?.text ? parsePlainChat(ans.text) : null;
-  if (plain) return { reply: reply(plain.reply, 1200), propose: plain.propose, offline: false };
-  if (ans?.text) return { reply: reply(ans.text, 1200), propose: null, offline: false };
+  const said = interpretChat(ans?.text);
+  if (said) return { ...said, offline: false };
   // Offline: the one useful thing without a model is turning the request into a proposed task.
   const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up|plan|check|list|suggest|prepare)\b/i.test(s(text, 200));
   return {
