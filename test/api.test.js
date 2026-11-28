@@ -158,3 +158,22 @@ describe('chosen names', () => {
     expect(await r.text()).toContain('href="/"');
   });
 });
+
+describe('start runs the approved jobs', () => {
+  test('jobs said yes to while stopped run when Start is pressed', async () => {
+    const { e, a, id } = await setup();
+    const d0 = await (await req(e, a, `/api/businesses/${id}`)).json();
+    await req(e, a, '/api/businesses/' + id + '/stop', 'POST', {});
+    // Stopped businesses refuse approvals, so approve while not yet started: use a fresh paused one.
+    const ob = await (await req(e, a, '/api/onboard', 'POST', { idea: 'A small bakery that delivers bread', name: 'bakery' })).json();
+    const bid = ob.id || ob.business?.id;
+    const d = await (await req(e, a, `/api/businesses/${bid}`)).json();
+    const w = d.work.find((x) => x.status === 'proposed');
+    expect((await (await req(e, a, `/api/work/${w.id}/approve`, 'POST', { hash: w.hash })).json()).status).toBe('approved');
+    const s = await (await req(e, a, `/api/businesses/${bid}/start`, 'POST', {})).json();
+    expect(s.ran).toBe(1);
+    const after = await (await req(e, a, `/api/businesses/${bid}`)).json();
+    expect(after.work.find((x) => x.id === w.id).status).not.toBe('approved');
+    expect(d0).toBeTruthy();
+  });
+});
