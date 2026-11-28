@@ -133,3 +133,17 @@ test('toText turns nested model replies into readable text, never [object Object
   expect(out).toContain('Kitchen staff:\n- Prepare food\n- Clean');
   expect(toText(['x', { y: 1 }])).toBe('- x\ny: 1');
 });
+
+import { parsePlainChat } from '../src/brain.js';
+test('plain "reply: ... propose: ..." model output is split, not shown raw', () => {
+  const r = parsePlainChat('reply: Hello back! propose: kind: research title: Describe a typical office customer body: What are their needs? spend_kind: none cost_usd: 0');
+  expect(r.reply).toBe('Hello back!');
+  expect(r.propose.title).toBe('Describe a typical office customer');
+  expect(r.propose.kind).toBe('research');
+  expect(parsePlainChat('reply: Hi there. propose: null')).toEqual({ reply: 'Hi there.', propose: null });
+  expect(parsePlainChat('Just some text')).toBeNull();
+});
+
+test('the word propose inside a reply is kept', () => {
+  expect(parsePlainChat("reply: Here's what I propose: ask customers.").reply).toBe("Here's what I propose: ask customers.");
+});
