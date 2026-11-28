@@ -143,3 +143,7 @@ test('plain "reply: ... propose: ..." model output is split, not shown raw', () 
   expect(parsePlainChat('reply: Hi there. propose: null')).toEqual({ reply: 'Hi there.', propose: null });
   expect(parsePlainChat('Just some text')).toBeNull();
 });
+
+test('the word propose inside a reply is kept', () => {
+  expect(parsePlainChat("reply: Here's what I propose: ask customers.").reply).toBe("Here's what I propose: ask customers.");
+});

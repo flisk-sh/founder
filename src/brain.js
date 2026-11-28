@@ -89,16 +89,21 @@ Answer ONLY with JSON: {"reply": "your answer, under 120 words", "propose": null
 
 // Some models ignore "answer with JSON" and write `reply: ... propose: kind: x title: y body: z ...` as plain text.
 // Show only the reply and turn the propose part into a task, instead of printing the whole thing to the owner.
+const PROPOSE = /\spropose:\s*(?=kind:|null\b|none\b)/i;
+const FIELD = /\b(kind|title|body|spend_kind|cost_usd):/gi;
 export function parsePlainChat(text) {
-  const m = String(text).match(/^\s*reply:\s*([\s\S]*?)(?:\s+propose:\s*([\s\S]*))?$/i);
-  if (!m || !m[1].trim()) return null;
-  let propose = null;
-  if (m[2] && !/^\s*(null|none)\b/i.test(m[2])) {
-    const f = {}, re = /\b(kind|title|body|spend_kind|cost_usd):\s*([\s\S]*?)(?=\s+(?:kind|title|body|spend_kind|cost_usd):|$)/gi;
-    for (let x; (x = re.exec(m[2]));) f[x[1].toLowerCase()] = x[2].trim();
-    propose = cleanTask(f);
-  }
-  return { reply: m[1], propose };
+  const raw = String(text).trim();
+  if (!/^reply:/i.test(raw)) return null;
+  const rest = raw.slice(6);
+  const cut = PROPOSE.exec(rest); // only "propose:" followed by a field or null splits; ordinary prose may use the word
+  const replyText = (cut ? rest.slice(0, cut.index) : rest).trim();
+  if (!replyText) return null;
+  if (!cut) return { reply: replyText, propose: null };
+  const tail = rest.slice(cut.index + cut[0].length);
+  const marks = [...tail.matchAll(FIELD)];
+  const fields = {};
+  marks.forEach((m, i) => { fields[m[1].toLowerCase()] = tail.slice(m.index + m[0].length, marks[i + 1]?.index ?? tail.length).trim(); });
+  return { reply: replyText, propose: marks.length ? cleanTask(fields) : null };
 }
 
 export async function chat(env, b, tasks, history, text) {
