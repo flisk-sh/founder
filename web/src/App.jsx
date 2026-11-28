@@ -126,7 +126,7 @@ function Onboard({onCreated}) {
 // ---------- business pieces ----------
 function TaskRow({w, act, ask}) {
   const [open, setOpen] = useState(false);
-  const st = {proposed: null, approved: ['You said yes', 'blue'], running: ['Working…', 'blue'], done: ['Done', 'success'], failed: ['Did not work', 'error'], rejected: ['You said no', 'neutral'], cancelled: ['Stopped', 'neutral']}[w.status];
+  const st = {proposed: null, approved: ['You said yes', 'blue'], running: ['Working…', 'blue'], done: ['Done', 'green'], failed: ['Did not work', 'red'], rejected: ['You said no', 'neutral'], cancelled: ['Stopped', 'neutral']}[w.status];
   const yes = () => act('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}, 'You said yes to “' + w.title + '”');
   const no = () => act('/api/work/' + w.id + '/reject', 'POST', {}, 'You said no to “' + w.title + '”');
   const now = () => act('/api/work/' + w.id + '/run', 'POST', {}, 'Done: ' + w.title);
@@ -413,11 +413,11 @@ function Business({id, onChange, onDeleted, businesses, go}) {
       <header className="work-head">
         <Heading level={2}>{b.name}</Heading>
         <HoverCard placement="below" content={<VStack gap={1} style={{maxWidth: 280, padding: 4}}><Text type="emphasized">{label}</Text><Text type="supporting" color="secondary">{b.status === 'active' ? 'Jobs you said yes to are being done. Press STOP to halt everything.' : b.status === 'stopped' ? 'Nothing happens until you press Start.' : 'Nothing happens until you press Start. Say yes to jobs first.'}</Text></VStack>}>
-          <span><Badge label={label} variant={b.status === 'active' ? 'success' : b.status === 'stopped' ? 'error' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} /></span>
+          <span><Badge label={label} variant={b.status === 'active' ? 'green' : b.status === 'stopped' ? 'red' : 'neutral'} icon={<StatusDot variant={dot} label={label} />} /></span>
         </HoverCard>
         <Text color="secondary" className="one">{b.one_liner || ''}</Text>
         <span className="next-in"><Icon icon={LightBulbIcon} size="sm" />{next}{busy && <em> · Working…</em>}</span>
-        {done > 0 && <Badge label={`${done} done`} variant="success" />}
+        {done > 0 && <Badge label={`${done} done`} variant="green" />}
         {spent > 0 && <Tooltip content={`Spent ${money(spent)} of your ${money(limit)} monthly limit`}><span><Badge label={done === 0 ? `Plan cost ${money(spent)} · limit ${money(limit)} a month` : `Spent ${money(spent)} of ${money(limit)} this month`} icon={ic(BanknotesIcon)} /></span></Tooltip>}
         <Tooltip content="Search and do anything"><span className="find-btn"><Button label="Search" size="sm" variant="secondary" icon={ic(MagnifyingGlassIcon)} onClick={() => setPalette(true)} endContent={<Kbd keys="mod+k" />} /></span></Tooltip>
         {b.status === 'active'
@@ -478,9 +478,9 @@ function Business({id, onChange, onDeleted, businesses, go}) {
             : <Text type="supporting" color="secondary">{d.site?.published ? 'When visitors leave their email on your page, it shows here.' : 'Once your page is online, visitors can leave their email and it shows here.'}</Text>}
           <div className="sec-h"><h3>Connections</h3><span className="sub">free ones work now</span></div>
           <table className="tbl conn"><tbody>
-            <tr><td>Your web page</td><td>{d.site?.published ? <Badge label="Online" variant="success" /> : <Badge label="Ready" />}</td></tr>
-            <tr><td>Email sign-up list</td><td><Badge label={d.site?.published ? 'On' : 'Ready'} variant={d.site?.published ? 'success' : undefined} /></td></tr>
-            <tr><td>Visitor count</td><td><Badge label={d.site?.published ? 'On' : 'Ready'} variant={d.site?.published ? 'success' : undefined} /></td></tr>
+            <tr><td>Your web page</td><td>{d.site?.published ? <Badge label="Online" variant="green" /> : <Badge label="Ready" />}</td></tr>
+            <tr><td>Email sign-up list</td><td><Badge label={d.site?.published ? 'On' : 'Ready'} variant={d.site?.published ? 'green' : undefined} /></td></tr>
+            <tr><td>Visitor count</td><td><Badge label={d.site?.published ? 'On' : 'Ready'} variant={d.site?.published ? 'green' : undefined} /></td></tr>
             {['Taking payments', 'Advertising (Google, Facebook)', 'Posting to Facebook, Instagram, X', 'Sending emails', 'Short link ' + b.name + '.flisk.si'].map((x) => <tr key={x}><td>{x}</td><td><Badge label="Coming soon" /></td></tr>)}
           </tbody></table>
           <div className="sec-h"><h3>Ideas to ask for</h3><span className="sub">click one, your assistant starts on it</span></div>
