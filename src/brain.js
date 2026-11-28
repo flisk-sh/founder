@@ -87,11 +87,27 @@ Open tasks: ${tasks.map((t) => `[${t.status}] ${t.title}`).join('; ') || 'none'}
 You cannot spend, send, post or deploy anything: you can only PROPOSE a task, which the founder approves. The owner is not technical (think a restaurant or shop owner): use plain everyday words, no tech or marketing jargon, short sentences. Be concrete and honest; say when you do not know.
 Answer ONLY with JSON: {"reply": "your answer, under 120 words", "propose": null or {"kind": "engineering|research|growth|ops", "title": "...", "body": "...", "spend_kind": "llm|infra", "cost_usd": 0.1-3}}`;
 
+// Some models ignore "answer with JSON" and write `reply: ... propose: kind: x title: y body: z ...` as plain text.
+// Show only the reply and turn the propose part into a task, instead of printing the whole thing to the owner.
+export function parsePlainChat(text) {
+  const m = String(text).match(/^\s*reply:\s*([\s\S]*?)(?:\s+propose:\s*([\s\S]*))?$/i);
+  if (!m || !m[1].trim()) return null;
+  let propose = null;
+  if (m[2] && !/^\s*(null|none)\b/i.test(m[2])) {
+    const f = {}, re = /\b(kind|title|body|spend_kind|cost_usd):\s*([\s\S]*?)(?=\s+(?:kind|title|body|spend_kind|cost_usd):|$)/gi;
+    for (let x; (x = re.exec(m[2]));) f[x[1].toLowerCase()] = x[2].trim();
+    propose = cleanTask(f);
+  }
+  return { reply: m[1], propose };
+}
+
 export async function chat(env, b, tasks, history, text) {
   const msgs = [{ role: 'system', content: CHAT_SYSTEM(b, tasks) }, ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: s(text, 1000) }];
   const ans = await ask(env, msgs, { maxTokens: 500 });
   const j = ans ? firstJson(ans.text) : null;
   if (j?.reply) return { reply: reply(j.reply, 1200), propose: j.propose ? cleanTask(j.propose) : null, offline: false };
+  const plain = ans?.text ? parsePlainChat(ans.text) : null;
+  if (plain) return { reply: reply(plain.reply, 1200), propose: plain.propose, offline: false };
   if (ans?.text) return { reply: reply(ans.text, 1200), propose: null, offline: false };
   // Offline: the one useful thing without a model is turning the request into a proposed task.
   const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up|plan|check|list|suggest|prepare)\b/i.test(s(text, 200));
