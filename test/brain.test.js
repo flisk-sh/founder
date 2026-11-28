@@ -147,3 +147,19 @@ test('plain "reply: ... propose: ..." model output is split, not shown raw', () 
 test('the word propose inside a reply is kept', () => {
   expect(parsePlainChat("reply: Here's what I propose: ask customers.").reply).toBe("Here's what I propose: ask customers.");
 });
+
+import { interpretChat } from '../src/reply.js';
+describe('interpretChat: every shape a model answers in', () => {
+  test.each([
+    ['json', '{"reply": "Hi", "propose": null}', 'Hi'],
+    ['json with prose around it', 'Sure! {"reply": "Hi", "propose": null} done', 'Hi'],
+    ['nested object reply', '{"reply": {"Kitchen": ["Prep"]}}', 'Kitchen:\n- Prep'],
+    ['plain reply line', 'reply: Hi there', 'Hi there'],
+    ['raw text', 'Hello owner', 'Hello owner'],
+  ])('%s', (_n, raw, want) => {
+    const r = interpretChat(raw);
+    expect(r.reply).toBe(want);
+    expect(r.reply).not.toContain('[object Object]');
+  });
+  test('no text is no answer', () => expect(interpretChat('')).toBeNull());
+});
