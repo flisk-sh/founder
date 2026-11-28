@@ -87,11 +87,32 @@ Open tasks: ${tasks.map((t) => `[${t.status}] ${t.title}`).join('; ') || 'none'}
 You cannot spend, send, post or deploy anything: you can only PROPOSE a task, which the founder approves. The owner is not technical (think a restaurant or shop owner): use plain everyday words, no tech or marketing jargon, short sentences. Be concrete and honest; say when you do not know.
 Answer ONLY with JSON: {"reply": "your answer, under 120 words", "propose": null or {"kind": "engineering|research|growth|ops", "title": "...", "body": "...", "spend_kind": "llm|infra", "cost_usd": 0.1-3}}`;
 
+// Some models ignore "answer with JSON" and write `reply: ... propose: kind: x title: y body: z ...` as plain text.
+// Show only the reply and turn the propose part into a task, instead of printing the whole thing to the owner.
+const PROPOSE = /\spropose:\s*(?=kind:|null\b|none\b)/i;
+const FIELD = /\b(kind|title|body|spend_kind|cost_usd):/gi;
+export function parsePlainChat(text) {
+  const raw = String(text).trim();
+  if (!/^reply:/i.test(raw)) return null;
+  const rest = raw.slice(6);
+  const cut = PROPOSE.exec(rest); // only "propose:" followed by a field or null splits; ordinary prose may use the word
+  const replyText = (cut ? rest.slice(0, cut.index) : rest).trim();
+  if (!replyText) return null;
+  if (!cut) return { reply: replyText, propose: null };
+  const tail = rest.slice(cut.index + cut[0].length);
+  const marks = [...tail.matchAll(FIELD)];
+  const fields = {};
+  marks.forEach((m, i) => { fields[m[1].toLowerCase()] = tail.slice(m.index + m[0].length, marks[i + 1]?.index ?? tail.length).trim(); });
+  return { reply: replyText, propose: marks.length ? cleanTask(fields) : null };
+}
+
 export async function chat(env, b, tasks, history, text) {
   const msgs = [{ role: 'system', content: CHAT_SYSTEM(b, tasks) }, ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: s(text, 1000) }];
   const ans = await ask(env, msgs, { maxTokens: 500 });
   const j = ans ? firstJson(ans.text) : null;
   if (j?.reply) return { reply: reply(j.reply, 1200), propose: j.propose ? cleanTask(j.propose) : null, offline: false };
+  const plain = ans?.text ? parsePlainChat(ans.text) : null;
+  if (plain) return { reply: reply(plain.reply, 1200), propose: plain.propose, offline: false };
   if (ans?.text) return { reply: reply(ans.text, 1200), propose: null, offline: false };
   // Offline: the one useful thing without a model is turning the request into a proposed task.
   const want = /^(please |can you |could you |pls )?(add|build|make|write|create|research|find|draft|fix|set up|plan|check|list|suggest|prepare)\b/i.test(s(text, 200));
