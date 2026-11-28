@@ -10,7 +10,7 @@ li:before{content:"✓  ";color:#2563eb;font-weight:700}.cta{display:inline-bloc
 footer{color:#94a3b8;font-size:13px;text-align:center;padding:24px}@media (prefers-color-scheme:dark){body{background:#0b1220;color:#e2e8f0}header,li{border-color:#1e293b}p{color:#94a3b8}}</style></head>
 <body><header><b>${esc(d.brand || human(name))}</b><span class="cta" style="padding:8px 14px;font-size:14px">${esc(d.cta)}</span></header>
 <main><h1>${esc(d.headline)}</h1><p>${esc(d.sub)}</p>${live ? `<form method="post" action="${esc(live.form)}" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><input type="email" name="email" required maxlength="254" placeholder="Your email" aria-label="Your email" style="font:inherit;padding:11px 14px;border:1px solid #cbd5e1;border-radius:10px;min-width:240px"><input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px"><button class="cta" style="border:0;font:inherit;font-weight:600;cursor:pointer">${esc(d.cta)}</button></form>${live.note ? `<p style="margin-top:14px;font-size:16px">${esc(live.note)}</p>` : ''}<p style="font-size:13px;margin-top:10px">We only use your email to tell you when we open. Ask us to remove it at any time.</p>` : `<span class="cta">${esc(d.cta)}</span>`}<ul>${(d.bullets || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></main>
-<footer>${esc(name)}.app.flisk.si${live ? '' : ' · draft, not published'}</footer></body></html>`;
+<footer>founder.flisk.si/s/${esc(name)}${live ? '' : ' · draft, not published'}</footer></body></html>`;
 }
 export const PREVIEW_HEADERS = {
   'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-frame-options': 'SAMEORIGIN',

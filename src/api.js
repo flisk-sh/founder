@@ -1,7 +1,7 @@
 // The cabinet API. Every query is scoped to the signed-in user; another user's business answers 404, never 403.
 import { chat, onboard } from './brain.js';
 import { siteStats } from './site.js';
-import { approve, reject, runNow, start, stop } from './lifecycle.js';
+import { approve, reject, retry, runNow, start, stop } from './lifecycle.js';
 import { audit, caps, own, spent } from './store.js';
 import { checkName, HOLD_MS, KINDS, SPEND, workHash } from './policy.js';
 
@@ -166,11 +166,11 @@ export async function api(req, env, url, me, now = Date.now()) {
     }
   }
 
-  r = p.match(/^\/api\/work\/([\w-]+)\/(approve|reject|run)$/);
+  r = p.match(/^\/api\/work\/([\w-]+)\/(approve|reject|run|retry)$/);
   if (r && m === 'POST') {
     const w = await env.DB.prepare('SELECT w.*, b.status AS b_status FROM work_items w JOIN businesses b ON b.id = w.business_id WHERE w.id = ? AND b.user_id = ?').bind(r[1], me.id).first();
     if (!w) return err(404, 'not_found');
-    return reply(r[2] === 'reject' ? await reject(env, me, w, now) : r[2] === 'approve' ? await approve(env, me, w, body.hash, now) : await runNow(env, me, w, now));
+    return reply(r[2] === 'reject' ? await reject(env, me, w, now) : r[2] === 'retry' ? await retry(env, me, w, now) : r[2] === 'approve' ? await approve(env, me, w, body.hash, now) : await runNow(env, me, w, now));
   }
   return err(404, 'not_found');
 }
