@@ -1,27 +1,16 @@
 // The cabinet API. Every query is scoped to the signed-in user; another user's business answers 404, never 403.
-import { chat, onboard, runTask } from './brain.js';
-import { publish, siteStats } from './site.js';
-import { checkName, DEFAULT_CAPS, fitsCap, HOLD_MS, KINDS, monthStart, SPEND, workHash } from './policy.js';
+import { chat, onboard } from './brain.js';
+import { siteStats } from './site.js';
+import { approve, reject, runNow, start, stop } from './lifecycle.js';
+import { audit, caps, own, spent } from './store.js';
+import { checkName, HOLD_MS, KINDS, SPEND, workHash } from './policy.js';
 
 const id = () => crypto.randomUUID();
 export const json = (status, body, extra = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra } });
 const err = (status, code) => json(status, { error: code });
+// A lifecycle result is either the body to send, or { http, error, ... } for a refusal.
+const reply = ({ http, ...rest }) => (rest.error ? json(http, rest) : json(200, rest));
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
-
-async function own(env, uid, bid) {
-  return env.DB.prepare('SELECT * FROM businesses WHERE id = ? AND user_id = ?').bind(bid, uid).first();
-}
-async function audit(env, bid, uid, action, detail, now) {
-  return env.DB.prepare('INSERT INTO audit (business_id, user_id, action, detail, at) VALUES (?, ?, ?, ?, ?)').bind(bid, uid, action, detail, now).run();
-}
-async function caps(env, bid) {
-  const rows = (await env.DB.prepare('SELECT kind, monthly_usd FROM caps WHERE business_id = ?').bind(bid).all()).results;
-  return Object.fromEntries(SPEND.map((k) => [k, rows.find((r) => r.kind === k)?.monthly_usd ?? DEFAULT_CAPS[k]]));
-}
-async function spent(env, bid, now) {
-  const rows = (await env.DB.prepare('SELECT kind, SUM(cost_usd) AS s FROM meter WHERE business_id = ? AND at >= ? GROUP BY kind').bind(bid, monthStart(now)).all()).results;
-  return Object.fromEntries(SPEND.map((k) => [k, rows.find((r) => r.kind === k)?.s ?? 0]));
-}
 
 export async function api(req, env, url, me, now = Date.now()) {
   const p = url.pathname, m = req.method;
@@ -122,18 +111,8 @@ export async function api(req, env, url, me, now = Date.now()) {
       return json(200, { reply: out.reply, proposed, offline: out.offline });
     }
     if ((sub === '/stop' || sub === '/start') && m === 'POST') {
-      const status = sub === '/stop' ? 'stopped' : 'active';
-      if (status === 'active' && !b.north_star) return err(400, 'north_star_missing');
-      await env.DB.prepare('UPDATE businesses SET status = ? WHERE id = ?').bind(status, b.id).run();
-      if (status === 'stopped') await env.DB.prepare("UPDATE work_items SET status = 'cancelled', decided = ? WHERE business_id = ? AND status IN ('proposed', 'approved')").bind(now, b.id).run();
-      await audit(env, b.id, me.id, status === 'stopped' ? 'stopped' : 'started', status === 'stopped' ? 'STOP pressed. All queued work cancelled.' : 'Started.', now);
-      // Jobs the owner already said yes to run now: Start promises it, and approving while stopped only queues them.
-      let ran = 0;
-      if (status === 'active') {
-        const { results } = await env.DB.prepare("SELECT id FROM work_items WHERE business_id = ? AND status = 'approved' ORDER BY decided").bind(b.id).all();
-        for (const w of results || []) { await run(env, me, w.id, now); ran++; }
-      }
-      return json(200, { status, ran });
+      const out = await (sub === '/stop' ? stop : start)(env, me, b, now);
+      return reply(out);
     }
     if (sub === '/caps' && m === 'PUT') {
       const stmts = [];
@@ -187,52 +166,11 @@ export async function api(req, env, url, me, now = Date.now()) {
     }
   }
 
-  r = p.match(/^\/api\/work\/([\w-]+)\/(approve|reject)$/);
+  r = p.match(/^\/api\/work\/([\w-]+)\/(approve|reject|run)$/);
   if (r && m === 'POST') {
     const w = await env.DB.prepare('SELECT w.*, b.status AS b_status FROM work_items w JOIN businesses b ON b.id = w.business_id WHERE w.id = ? AND b.user_id = ?').bind(r[1], me.id).first();
     if (!w) return err(404, 'not_found');
-    if (w.status !== 'proposed') return err(409, 'already_decided');
-    if (r[2] === 'reject') {
-      await env.DB.prepare("UPDATE work_items SET status = 'rejected', decided = ? WHERE id = ?").bind(now, w.id).run();
-      await audit(env, w.business_id, me.id, 'rejected', w.title, now);
-      return json(200, { status: 'rejected' });
-    }
-    // The approval names the exact item it saw. If the item changed since, the hash differs and nothing runs.
-    if (body.hash !== w.hash || (await workHash(w)) !== w.hash) return err(409, 'approval_mismatch');
-    if (w.b_status === 'stopped') return err(409, 'business_stopped');
-    const fit = fitsCap(w.spend_kind, w.cost_usd, await spent(env, w.business_id, now), await caps(env, w.business_id));
-    if (!fit.ok) return json(402, { error: 'over_cap', ...fit });
-    // The approved amount is reserved at once, so two approvals cannot together pass the cap.
-    await env.DB.batch([env.DB.prepare("UPDATE work_items SET status = 'approved', decided = ? WHERE id = ? AND status = 'proposed'").bind(now, w.id),
-      env.DB.prepare('INSERT INTO meter (business_id, kind, cost_usd, note, at) VALUES (?, ?, ?, ?, ?)').bind(w.business_id, w.spend_kind, w.cost_usd, `reserved: ${w.title}`, now)]);
-    await audit(env, w.business_id, me.id, 'approved', `${w.title} (up to $${w.cost_usd} ${w.spend_kind}, hash ${w.hash.slice(0, 12)})`, now);
-    if (w.b_status !== 'active') return json(200, { status: 'approved', note: 'Runs when you press Start.' });
-    return json(200, await run(env, me, w.id, now));
-  }
-  r = p.match(/^\/api\/work\/([\w-]+)\/run$/);
-  if (r && m === 'POST') {
-    const w = await env.DB.prepare('SELECT w.id, b.status AS b_status FROM work_items w JOIN businesses b ON b.id = w.business_id WHERE w.id = ? AND b.user_id = ?').bind(r[1], me.id).first();
-    if (!w) return err(404, 'not_found');
-    if (w.b_status !== 'active') return err(409, 'not_started');
-    return json(200, await run(env, me, w.id, now));
+    return reply(r[2] === 'reject' ? await reject(env, me, w, now) : r[2] === 'approve' ? await approve(env, me, w, body.hash, now) : await runNow(env, me, w, now));
   }
   return err(404, 'not_found');
-}
-
-// Does one approved task. Claims it first (approved -> running) so two clicks never run it twice.
-async function run(env, me, wid, now) {
-  const claim = await env.DB.prepare("UPDATE work_items SET status = 'running' WHERE id = ? AND status = 'approved'").bind(wid).run();
-  if (!(claim.changes ?? claim.meta?.changes)) return { status: 'already_running_or_done' };
-  const w = await env.DB.prepare('SELECT * FROM work_items WHERE id = ?').bind(wid).first();
-  const b = await env.DB.prepare('SELECT * FROM businesses WHERE id = ?').bind(w.business_id).first();
-  const goesOnline = w.kind === 'engineering' && /web page online|publish/i.test(w.title);
-  const out = await (goesOnline ? publish(env, b, now) : runTask(env, b, w)).catch(() => ({ ok: false, result: '', verified: 'Failed with an error. Nothing was spent.' }));
-  const t = Math.max(Date.now(), now + 1);
-  // The reservation is released and replaced by what was really spent: the free models cost $0.
-  await env.DB.batch([
-    env.DB.prepare('UPDATE work_items SET status = ?, result = ?, verified = ?, finished = ? WHERE id = ?').bind(out.ok ? 'done' : 'failed', out.result, out.verified, t, wid),
-    env.DB.prepare('INSERT INTO meter (business_id, kind, cost_usd, note, at) VALUES (?, ?, ?, ?, ?)').bind(w.business_id, w.spend_kind, -w.cost_usd, `released: ${w.title}`, t),
-  ]);
-  await audit(env, w.business_id, me.id, out.ok ? 'done' : 'failed', `${w.title}. ${out.verified}`, t);
-  return { status: out.ok ? 'done' : 'failed' };
 }
