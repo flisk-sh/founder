@@ -1,3 +1,5 @@
+import {call, money, nJobs, SPEND_LABEL} from './client.js';
+import {useBusiness} from './useBusiness.js';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {HStack, VStack} from '@astryxdesign/core/Layout';
 import {Card} from '@astryxdesign/core/Card';
@@ -34,31 +36,15 @@ import {
 
 // founder.flisk.si cabinet. Founder drafts and proposes; the owner approves every task and every dollar.
 const ic = (I) => <Icon icon={I} size="sm" />;
-const money = (n) => '$' + Number(n || 0).toFixed(2).replace(/\.00$/, '');
 // Owner-facing log line: the stored record keeps the approval hash and spend kind; people only need the job.
 const plain = (t) => String(t || '').replace(/\s*\(up to [^)]*\)/, '');
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
-const ERR = {
-  name_invalid: 'Use only small letters, numbers and dashes, like marios-pizza.', name_reserved: 'That name is not available. Please pick another.',
-  name_taken: 'Someone already uses that name. Please pick another.', name_held: 'That name is not available for 30 more days. Please pick another.', limit_reached: 'You can have up to 3 businesses for now.',
-  north_star_missing: 'First fill in “How we measure success”.', over_cap: 'This costs more than your monthly limit. Raise the limit, or say no to it.',
-  approval_mismatch: 'This job changed. Please look at it again.', business_stopped: 'Everything is stopped. Press Start first.', not_started: 'Press Start first.',
-  confirm_name: 'Type the name exactly as shown.', cap_invalid: 'A limit can be from $0 to $10,000.', work_invalid: 'Write what the job is, and a cost from $0 to $1,000.', idea_short: 'Please write a few more words.',
-};
-async function call(path, method = 'GET', body) {
-  const r = await fetch(path, {method, headers: body ? {'content-type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
-  const j = await r.json().catch(() => ({}));
-  if (r.status === 401) { location.href = '/auth/start'; throw new Error('Please sign in.'); }
-  if (!r.ok) throw new Error(ERR[j.error] || j.error || 'Something went wrong. Please try again.');
-  return j;
-}
 const path = () => location.pathname.replace(/\/+$/, '');
-const nJobs = (n) => n + (n === 1 ? ' job' : ' jobs');
 const STATUS = {active: ['success', 'Working'], paused: ['neutral', 'Not started'], stopped: ['error', 'Stopped']};
 // What each logged action means, in plain words.
 const siteUrl = (name) => (/\.flisk\.si$/.test(location.hostname) ? 'https://' + name + '.app.flisk.si' : '/s/' + name);
 const DID = {unpublished: 'Taken offline', signup_removed: 'Email removed', created: 'Plan made', approved: 'You said yes', rejected: 'You said no', started: 'Started', stopped: 'Stopped', done: 'Done', failed: 'Did not work', running: 'Working on it', caps: 'Limits changed', settings: 'Details changed', proposed: 'New job suggested', deleted: 'Deleted'};
-const SPEND_LABEL = {llm: 'Assistant', ads: 'Advertising', infra: 'Web page', mail: 'Emails'};
+
 const KIND_ICON = {engineering: BoltIcon, research: LightBulbIcon, growth: ChartBarIcon, ops: ClipboardDocumentListIcon};
 
 // ---------- signed out ----------
@@ -344,17 +330,10 @@ function Chat({d, reload, text, setText, inputRef}) {
 }
 
 function Business({id, onChange, onDeleted, businesses, go}) {
-  const [d, setD] = useState(null), [busy, setBusy] = useState(false), [drawer, setDrawer] = useState(''), [palette, setPalette] = useState(false);
+  const [drawer, setDrawer] = useState(''), [palette, setPalette] = useState(false);
   const [text, setText] = useState(''), [adding, setAdding] = useState(false), [doc, setDoc] = useState(null), inputRef = useRef(null), toast = useToast();
   const say = (body) => toast({body, autoHideDuration: 4000});
-  const load = useCallback(() => call('/api/businesses/' + id).then(setD).catch((x) => say(x.message)), [id]);
-  useEffect(() => { setD(null); load(); }, [load]);
-  const run = async (fn, ok) => { setBusy(true); try { await fn(); say(ok); } catch (x) { say(x.message); } finally { await load(); onChange(); setBusy(false); } };
-  const act = async (url, method, body, ok) => {
-    setBusy(true);
-    try { const j = await call(url, method, body); say(j.note ? ok + '. ' + j.note : j.status === 'failed' ? 'It did not work. Open the job to see why.' : ok); await load(); onChange(); return true; }
-    catch (x) { say(x.message); return false; } finally { setBusy(false); }
-  };
+  const {d, busy, load, run, act, start, stop, approve, yesAll: yesAllOf, setCap} = useBusiness(id, {say, onChange});
   const askNow = (t) => run(async () => { await call('/api/businesses/' + b.id + '/chat', 'POST', {text: t}); }, 'Asked: ' + t);
   const ask = (t) => { setText(t); setTimeout(() => inputRef.current?.focus?.(), 50); };
   useHotkeys([
@@ -365,10 +344,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
   const b = d.business, [dot, label] = STATUS[b.status] || STATUS.paused;
   const waiting = d.work.filter((w) => w.status === 'proposed'), done = d.work.filter((w) => w.status === 'done').length;
   const spent = Math.max(0, Object.values(d.spent).reduce((x, c) => x + c, 0)), limit = Object.values(d.caps).reduce((x, c) => x + c, 0);
-  const start = () => act('/api/businesses/' + b.id + '/start', 'POST', {}, 'Started. The jobs you said yes to will now be done.');
-  const stop = () => act('/api/businesses/' + b.id + '/stop', 'POST', {}, 'Stopped. Nothing else will happen.');
-  const yesAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${nJobs(waiting.length)}`);
-  const setCap = (k, v) => act('/api/businesses/' + b.id + '/caps', 'PUT', {...d.caps, [k]: v}, `${SPEND_LABEL[k]} limit is now ${money(v)} a month`);
+  const yesAll = () => yesAllOf(waiting);
   const copyAddr = () => { navigator.clipboard?.writeText('https://' + b.name + '.app.flisk.si'); say('Address copied'); };
   const download = () => { location.href = '/api/businesses/' + b.id + '/export'; };
   // The next useful thing to do, instead of a row of zeros.
@@ -397,7 +373,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
     b.status === 'active' ? {id: 'stop', label: 'STOP everything', run: stop} : {id: 'start', label: 'Start', run: start},
     {id: 'add', label: 'Add a job', run: () => setAdding(true)},
     {id: 'ask', label: 'Ask your assistant', run: () => ask('')},
-    ...waiting.map((w) => ({id: 'yes:' + w.id, label: 'Yes: ' + w.title, run: () => act('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}, 'You said yes')})),
+    ...waiting.map((w) => ({id: 'yes:' + w.id, label: 'Yes: ' + w.title, run: () => approve(w)})),
     {id: 'site', label: 'Open your web page', run: () => setDrawer('site')},
     {id: 'details', label: 'Change details', run: () => setDrawer('details')},
     {id: 'limits', label: 'Change monthly limits', run: () => setDrawer('details')},
