@@ -5,7 +5,7 @@ import { landingHtml, PREVIEW_HEADERS } from './preview.js';
 import { APP_CSS_PATH, APP_JS_PATH, appAsset } from './app.js';
 import { siteRoute, siteTarget } from './site.js';
 
-const CSP = "default-src 'self'; script-src 'self' https://flisk.si; style-src 'self' 'unsafe-inline' https://flisk.si; font-src 'self'; img-src 'self' data: https://flisk.si; connect-src 'self' https://flisk.si; frame-src https://chat.flisk.si; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
+const CSP = "default-src 'self'; script-src 'self' https://flisk.si https://flisk.sh; style-src 'self' 'unsafe-inline' https://flisk.si https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://flisk.si; connect-src 'self' https://flisk.si https://flisk.sh https://analytics.flisk.si; frame-src 'self' https://chat.flisk.si; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
 const SECURE = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'strict-transport-security': 'max-age=31536000; includeSubDomains', 'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()', 'cross-origin-opener-policy': 'same-origin', 'content-security-policy': CSP };
 const withSecure = (res) => { const out = new Response(res.body, res); for (const [k, v] of Object.entries(SECURE)) if (!out.headers.has(k)) out.headers.set(k, v); return out; };
 

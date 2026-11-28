@@ -21,7 +21,7 @@ export async function publish(env, b, now) {
   const d = await env.DB.prepare('SELECT data FROM drafts WHERE business_id = ?').bind(b.id).first();
   if (!d) return { ok: false, result: '', verified: 'There was no web page draft to put online. Nothing changed.' };
   await env.DB.prepare('INSERT INTO sites (business_id, data, published) VALUES (?, ?, ?) ON CONFLICT(business_id) DO UPDATE SET data = excluded.data, published = excluded.published').bind(b.id, d.data, now).run();
-  return { ok: true, result: `Your web page is online at https://${b.name}.app.flisk.si. Visitors can leave their email there.`, verified: 'Online now. You can take it offline at any time.' };
+  return { ok: true, result: `Your web page is online at https://founder.flisk.si/s/${b.name}. Visitors can leave their email there.`, verified: 'Online now. You can take it offline at any time.' };
 }
 
 export async function siteRoute(req, env, url, t, now = Date.now()) {
