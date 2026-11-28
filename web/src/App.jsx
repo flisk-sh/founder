@@ -53,6 +53,7 @@ async function call(path, method = 'GET', body) {
   return j;
 }
 const path = () => location.pathname.replace(/\/+$/, '');
+const nJobs = (n) => n + (n === 1 ? ' job' : ' jobs');
 const STATUS = {active: ['success', 'Working'], paused: ['neutral', 'Not started'], stopped: ['error', 'Stopped']};
 // What each logged action means, in plain words.
 const siteUrl = (name) => (/\.flisk\.si$/.test(location.hostname) ? 'https://' + name + '.app.flisk.si' : '/s/' + name);
@@ -185,11 +186,11 @@ function Queue({d, act, run, ask, adding, setAdding}) {
   const waiting = by(['proposed']), queued = by(['approved', 'running']), done = by(['done', 'failed']), closed = by(['rejected', 'cancelled']);
   const sum = waiting.reduce((a, w) => a + w.cost_usd, 0);
   const [showClosed, setShowClosed] = useState(false);
-  const approveAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${waiting.length} jobs`);
+  const approveAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${nJobs(waiting.length)}`);
   return (
     <div className="queue">
       <div className="queue-head">
-        <Text type="emphasized">{waiting.length ? `${waiting.length} jobs need your answer` : 'Nothing needs your answer'}</Text>
+        <Text type="emphasized">{waiting.length ? `${nJobs(waiting.length)} ${waiting.length === 1 ? 'needs' : 'need'} your answer` : 'Nothing needs your answer'}</Text>
         {waiting.length > 1 && <Button label={`Yes to all (spend up to ${money(sum)})`} size="sm" variant="ghost" icon={ic(CheckIcon)} onClick={approveAll} />}
         <span style={{flex: 1}} />
         <Tooltip content="Add a job"><span><IconButton label="Add a job" icon={<Icon icon={PlusIcon} size="sm" />} size="sm" variant="secondary" onClick={() => setAdding(!adding)} /></span></Tooltip>
@@ -366,7 +367,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
   const spent = Math.max(0, Object.values(d.spent).reduce((x, c) => x + c, 0)), limit = Object.values(d.caps).reduce((x, c) => x + c, 0);
   const start = () => act('/api/businesses/' + b.id + '/start', 'POST', {}, 'Started. The jobs you said yes to will now be done.');
   const stop = () => act('/api/businesses/' + b.id + '/stop', 'POST', {}, 'Stopped. Nothing else will happen.');
-  const yesAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${waiting.length} jobs`);
+  const yesAll = () => run(async () => { for (const w of waiting) await call('/api/work/' + w.id + '/approve', 'POST', {hash: w.hash}); }, `You said yes to ${nJobs(waiting.length)}`);
   const setCap = (k, v) => act('/api/businesses/' + b.id + '/caps', 'PUT', {...d.caps, [k]: v}, `${SPEND_LABEL[k]} limit is now ${money(v)} a month`);
   const copyAddr = () => { navigator.clipboard?.writeText('https://' + b.name + '.app.flisk.si'); say('Address copied'); };
   const download = () => { location.href = '/api/businesses/' + b.id + '/export'; };
@@ -374,7 +375,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
   const next = b.status === 'stopped' ? 'Everything is stopped. Press Start when you want to go on.'
     : !b.north_star ? 'Next: tell us how you measure success (⋯ → Details).'
     : waiting.length && b.status !== 'active' ? `Next: say yes to the jobs you like, then press Start.`
-    : waiting.length ? `${waiting.length} jobs wait for your answer.`
+    : waiting.length ? `${nJobs(waiting.length)} ${waiting.length === 1 ? 'waits' : 'wait'} for your answer.`
     : b.status !== 'active' ? 'Next: press Start.' : 'All set. Ask your assistant for the next idea.';
   const menu = [
     {label: 'Your web page', description: 'Draft, not online yet', icon: GlobeAltIcon, items: [
@@ -431,7 +432,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
           <div className="agent">
             <pre className="face">{b.status === 'active' ? '( ^ ‿ ^ )' : b.status === 'stopped' ? '( - _ - )' : '( o ‿ o )'}</pre>
             <div><b>{b.status === 'active' ? 'Working' : b.status === 'stopped' ? 'Stopped' : 'Waiting for you'}</b>
-              <Text type="supporting" color="secondary">{b.status === 'active' ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : `${done} of ${d.work.length} jobs done so far.`}</Text></div>
+              <Text type="supporting" color="secondary">{b.status === 'active' ? 'Doing the jobs you said yes to. Press STOP at the top to halt it.' : `${done} of ${nJobs(d.work.length)} done so far.`}</Text></div>
           </div>
           <div className="sec-h"><h3>Business</h3><button className="link" onClick={() => setDrawer('details')}>Change</button></div>
           <dl className="nums">

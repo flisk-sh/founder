@@ -127,7 +127,13 @@ export async function api(req, env, url, me, now = Date.now()) {
       await env.DB.prepare('UPDATE businesses SET status = ? WHERE id = ?').bind(status, b.id).run();
       if (status === 'stopped') await env.DB.prepare("UPDATE work_items SET status = 'cancelled', decided = ? WHERE business_id = ? AND status IN ('proposed', 'approved')").bind(now, b.id).run();
       await audit(env, b.id, me.id, status === 'stopped' ? 'stopped' : 'started', status === 'stopped' ? 'STOP pressed. All queued work cancelled.' : 'Started.', now);
-      return json(200, { status });
+      // Jobs the owner already said yes to run now: Start promises it, and approving while stopped only queues them.
+      let ran = 0;
+      if (status === 'active') {
+        const { results } = await env.DB.prepare("SELECT id FROM work_items WHERE business_id = ? AND status = 'approved' ORDER BY decided").bind(b.id).all();
+        for (const w of results || []) { await run(env, me, w.id, now); ran++; }
+      }
+      return json(200, { status, ran });
     }
     if (sub === '/caps' && m === 'PUT') {
       const stmts = [];
