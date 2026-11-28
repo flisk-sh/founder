@@ -339,8 +339,8 @@ function Business({id, onChange, onDeleted, businesses, go}) {
   const [text, setText] = useState(''), [adding, setAdding] = useState(false), [doc, setDoc] = useState(null), inputRef = useRef(null), toast = useToast();
   const say = (body) => toast({body, autoHideDuration: 4000});
   const {d, busy, load, run, act, start, stop, approve, yesAll: yesAllOf, setCap} = useBusiness(id, {say, onChange});
-  const askNow = (t) => run(async () => { await call('/api/businesses/' + b.id + '/chat', 'POST', {text: t}); }, 'Asked: ' + t);
-  const ask = (t) => { setText(t); setTimeout(() => inputRef.current?.focus?.(), 50); };
+  const askNow = (t) => { navigator.clipboard?.writeText(t).catch(() => {}); say('Copied “' + t + '”. Paste it in the chat on the right.'); };
+  const ask = (t) => { if (t) { navigator.clipboard?.writeText(t).catch(() => {}); say('Copied. Paste it in the chat on the right.'); } };
   useHotkeys([
     {keys: 'mod+k', allowInInputs: true, onPress: () => setPalette((x) => !x)},
     {keys: '/', onPress: () => inputRef.current?.focus?.()},
@@ -483,7 +483,7 @@ function Business({id, onChange, onDeleted, businesses, go}) {
             ? <button className="link" onClick={() => setDoc({title: w.title, body: w.result})}>Read the drafts: {w.title}</button>
             : <Text type="supporting" color="secondary">{w ? 'Say yes to “' + w.title + '” and the drafts appear here. You post them yourself.' : 'Ask for posts and the drafts appear here. You post them yourself.'}</Text>; })()}
         </section>
-        <aside className="board-chat"><Chat d={d} reload={load} text={text} setText={setText} inputRef={inputRef} /></aside>
+        <aside className="board-chat"><iframe className="chat-frame" title="Chat with your assistant" src="https://chat.flisk.si/embed" allow="clipboard-write; microphone" /></aside>
       </div>
       <VisitsPanel d={d} />
       <Drawer isOpen={!!doc} onOpenChange={(o) => !o && setDoc(null)} label={doc?.title || 'Document'} side="end" width={640}>
